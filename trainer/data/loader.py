@@ -8,7 +8,8 @@ from datasets import load_dataset
 from transformers import AutoTokenizer
 import glob
 import concurrent.futures
-
+from dotenv import load_dotenv
+load_dotenv()
 
 def sanitize_dataset_name(dataset_name):
     # Replace characters that are not valid in file names.
@@ -118,7 +119,7 @@ def process_split_file(split_file, tokenized_data_dir, tokenizer_model):
     the tokenized output as a NumPy array.
     """
     # Each worker loads its own tokenizer instance.
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, token="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")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_model, token=os.getenv("HF_TOKEN"))
     tokenized_examples = []
     with open(split_file, "r", encoding="utf-8") as f:
         data = f.read()
