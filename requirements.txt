@@ -1,0 +1,5 @@
+datasets
+transformers
+torch
+python-dotenv
+matplotlib
