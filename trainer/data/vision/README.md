@@ -1,0 +1,1 @@
+##TODO astika : add mnist csv, readmes

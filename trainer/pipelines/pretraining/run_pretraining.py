@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 from trainer.model.nlp import TinyLLM
-from trainer.pipelines.pretrain import TokenizedDataset
+from trainer.pipelines.pretraining.legacy.pretrain import TokenizedDataset
 from trainer.pipelines.config import ModelConfig
 
 
