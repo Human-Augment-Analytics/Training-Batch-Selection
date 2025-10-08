@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
-from trainer.pipelines.pretrain import TokenizedDataset, train
+from trainer.pipelines.pretraining.legacy.pretrain import TokenizedDataset, train
 from trainer.model.nlp import TinyLLM
 from trainer.pipelines.config import ModelConfig
 
