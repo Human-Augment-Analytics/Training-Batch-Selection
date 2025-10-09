@@ -1,0 +1,24 @@
+
+Random:
+Epoch 1: train_acc=0.9056±0.0028, test_acc=0.9450±0.0021, train_loss=0.3491±0.0082
+Epoch 2: train_acc=0.9533±0.0019, test_acc=0.9613±0.0012, train_loss=0.1611±0.0061
+Epoch 3: train_acc=0.9674±0.0007, test_acc=0.9676±0.0017, train_loss=0.1118±0.0036
+Epoch 4: train_acc=0.9747±0.0012, test_acc=0.9717±0.0014, train_loss=0.0851±0.0028
+Epoch 5: train_acc=0.9799±0.0005, test_acc=0.9737±0.0023, train_loss=0.0669±0.0015
+CPU Time: 5.08±0.24 sec
+
+Fixed:
+Epoch 1: train_acc=0.9033±0.0016, test_acc=0.9392±0.0021, train_loss=0.3623±0.0051
+Epoch 2: train_acc=0.9504±0.0007, test_acc=0.9567±0.0021, train_loss=0.1706±0.0020
+Epoch 3: train_acc=0.9653±0.0007, test_acc=0.9623±0.0020, train_loss=0.1185±0.0021
+Epoch 4: train_acc=0.9738±0.0010, test_acc=0.9657±0.0020, train_loss=0.0892±0.0022
+Epoch 5: train_acc=0.9796±0.0007, test_acc=0.9685±0.0028, train_loss=0.0699±0.0022
+CPU Time: 3.98±0.09 sec
+
+Smart:
+Epoch 1: train_acc=0.8995±0.0025, test_acc=0.9460±0.0032, train_loss=0.3693±0.0039
+Epoch 2: train_acc=0.9360±0.0029, test_acc=0.9647±0.0032, train_loss=0.2191±0.0095
+Epoch 3: train_acc=0.9550±0.0028, test_acc=0.9719±0.0025, train_loss=0.1560±0.0084
+Epoch 4: train_acc=0.9676±0.0019, test_acc=0.9754±0.0017, train_loss=0.1159±0.0060
+Epoch 5: train_acc=0.9782±0.0023, test_acc=0.9766±0.0007, train_loss=0.0841±0.0068
+CPU Time: 18.63±0.27 sec
