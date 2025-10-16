@@ -17,15 +17,16 @@ from trainer.pipelines.vision.vision import train_random, run_experiment, aggreg
 ###    Step 1: write the subclass in trainer/dataloader/vision.py
 ###    Step 2: add the specs below in DATASET_SPECS: input dimensions and number of classes
 ###    Step 3: write a builder function below that calls the dataset constructor
-###    Step 4: add the dataset to ROOTS below in __main__ with key matching the one in DATASET_SPECS and
+###    Step 4: associate the builder function defined in Step 3 with a dataset key matching Step 2
+###    Step 5: add the dataset to ROOTS below in __main__ with key matching the one in DATASET_SPECS and
 ###               value matching the vision datasets environment variables below
-###    Step 5: specify the list of dataset names to test in __main__  DATASETS
+###    Step 6: specify the list of dataset names to test in __main__  DATASETS
 #####
 
 
 ##### DATASET PATH VARIABLES AND ACCESS
-
 # should be set in higher level configuration so vision and NLP stay in sync - maybe yaml
+
 DATASETS_DIR = "/storage/ice-shared/cs8903onl/lw-batch-selection/datasets"
 VISION_DATASETS_DIR = os.path.join(DATASETS_DIR, "vision")
 
@@ -43,6 +44,9 @@ VOC2012_DIR    = os.path.join(VISION_DATASETS_DIR, "voc2012")
 CINIC10_DIR    = os.path.join(VISION_DATASETS_DIR, "CINIC-10")
 WIKI_DIR     = os.path.join(VISION_DATASETS_DIR, "wikipedia_dataset")
 
+### Step 2: to add a new dataset, specify input dimensions and number of classes here,
+### and create a builder key (for now just the same key as the DATASET_SPECS dict key)
+
 # put in trainer/pipelines/vision/registry.py?
 DATASET_SPECS = {
     "mnist":   {"input_dim": 28*28,   "num_classes": 10, "builder": "mnist"},
@@ -54,12 +58,13 @@ DATASET_SPECS = {
 
 ##### DATASET BUILDING - CREATE SUBCLASSES
 
-# Builder functions
+# Individual builder functions
 # put in trainer/pipelines/vision/builders.py?
 from trainer.dataloader.vision_dataloader import (
     MNISTCsvDataset, MNISTRawDataset, QMNISTDataset, CIFAR10Dataset
 )
 
+### Step 3: write a builder function that calls the daset constructor with appropriate specifications
 def build_mnist(root):
     return (
         # For best results
@@ -75,7 +80,7 @@ def build_mnist_csv(root):
     test_csv = os.path.join(root, 'mnist_test.csv')
     return (
         MNISTCsvDataset(train_csv),
-        MNISTCsvDataset(test_csv)
+        MNISTCsvDataset(test_csv),
     )
 
 def build_qmnist(root):
@@ -85,12 +90,13 @@ def build_qmnist(root):
     )
 
 def build_cifar10_flat(root):
-    # flattened 3*32*32 inputs to keep same MLP
+    # flattened 3*32*32 inputs to run with MLP
     return (
         CIFAR10Dataset(root, train=True,  flatten=True,  download=False),
         CIFAR10Dataset(root, train=False, flatten=True,  download=False),
     )
 
+### Step 4: associate the builder function with the builder key defined in Step 3
 BUILDER_FUNCS = {
     "mnist": build_mnist,
     "mnist_csv": build_mnist_csv,
@@ -144,6 +150,7 @@ def build_model_for(name, train_ds, hidden_dim=128):
 
     return SimpleMLP(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc)
 
+##### MAIN PROCEDURE
 # functions currently defined in vision.py:__main__
 
 def save_summary(name, means, cis, file):
@@ -215,12 +222,16 @@ def run_benchmark(datasets, roots, epochs=5, batch_size=64, n_runs=5):
 
 if __name__ == "__main__":
 
+    ### Step 5: add the dataset to ROOTS below in __main__ with key matching the one in DATASET_SPECS and
+    ###               value matching the vision datasets environment variables at top
+
     ROOTS = {
             "mnist":   MNIST_DIR,
             "mnist_csv":   MNIST_CSV_DIR,
             "qmnist":  QMNIST_DIR,
             "cifar10_flat": CIFAR10_DIR,
         }
-#    DATASETS = ["qmnist", "mnist"]  # or ["mnist", "cifar10", ...]
+    ### Step 6: add the dataset key to the list of datasets to test
     DATASETS = ["mnist_csv", "qmnist", "mnist", "cifar10_flat"]  # or ["mnist", "cifar10", ...]
+
     run_benchmark(DATASETS, ROOTS, epochs=5, batch_size=64, n_runs=3)
