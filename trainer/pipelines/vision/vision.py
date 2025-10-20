@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 # Load dataset
-#train_ds = MNISTCsvDataset(TRAIN_CSV)
-#test_ds = MNISTCsvDataset(TEST_CSV)
+train_ds = MNISTCsvDataset(TRAIN_CSV)
+test_ds = MNISTCsvDataset(TEST_CSV)
 
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
