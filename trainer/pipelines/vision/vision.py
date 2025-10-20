@@ -146,8 +146,6 @@ def aggregate_results(results):
 # ============ MAIN ============
 
 if __name__ == '__main__':
-    train_ds = MNISTCsvDataset(TRAIN_CSV)
-    test_ds = MNISTCsvDataset(TEST_CSV)
     # Loop over batch strategies from config/constants
     for strategy_label, strategy_path in BATCH_STRATEGIES.items():
         print(f"\n==== Running with batching strategy: {strategy_label} ====")
