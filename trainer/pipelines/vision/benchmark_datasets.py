@@ -1,4 +1,3 @@
-# trainer/pipelines/vision/benchmark_with_registry.py
 import os
 import importlib
 import numpy as np
@@ -13,11 +12,11 @@ from trainer.dataloader.factory import build_dataset, build_model_for
 from trainer.constants_datasets import DATASET_SPECS
 from trainer.constants import SHARED_DATA_DIR
 
-# -------- config you’ll likely tweak --------
+# -------- config to tweak --------
 EPOCHS = 5
 BATCH_SIZE = 64
 N_RUNS = 3
-DATASETS = ["mnist", "qmnist", "cifar10_flat"]  # names must exist in DATASET_SPECS
+DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # names must exist in DATASET_SPECS
 # -------------------------------------------
 
 def dataset_root(ds_name: str) -> str:
@@ -61,10 +60,8 @@ def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS)
 
     for ds_name in datasets:
         print(f"\n=== DATASET: {ds_name} ===")
-#        root = dataset_root(ds_name)
 
-        # Build datasets & model (uses your registry + factory checks)
-#        train_ds, test_ds = build_dataset(shared_root=root, name=ds_name)
+        # Build datasets and model 
         train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=ds_name)
 
         model_ctor = lambda: build_model_for(ds_name, train_ds, model_cls=SimpleMLP)

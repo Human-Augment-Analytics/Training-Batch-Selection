@@ -1,5 +1,6 @@
 import importlib
 import os
+import torch
 from trainer.constants_datasets import DATASET_SPECS
 
 # One shared place to compute the on-disk path for a dataset name
@@ -54,4 +55,5 @@ def build_model_for(name: str, train_ds, model_cls, hidden_dim: int = 128, **mod
         print(f"Warning: [{name}] num_classes spec={cfg_nc}, inferred={inf_nc}")
 
 #    return SimpleMLP(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc)
+    # allow for model specification
     return model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
