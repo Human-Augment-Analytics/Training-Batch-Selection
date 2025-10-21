@@ -78,6 +78,22 @@ trainer/pipelines/vision/output/
     ...
 ```
 
+### To Compare Datasets
+
+You can run the same experiment on different datasets by running
+```bash
+python -m trainer.pipelines.vision.benchmark_datasets.py
+```
+- This script calls the experiment specified in `trainer/pipelines/vision/vision.py`
+- Specify the list of datasets to compare in the `DATASETS` variable at the top of `trainer/pipelines/vision/benchmark_datasets.py`, e.g. `DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]`
+- result plots will be saved to the directory specified in the experiment implementation
+
+### To Add a Dataset
+
+- Add specifications (input dimensions, number of classes, etc.) to `trainer/constants_datasets.py`
+- Add a builder to `trainer/dataloader/builders.py`
+
+
 ### About the Constants Files
 
 - All major configuration for the pipeline is controlled via two key files:
@@ -86,6 +102,7 @@ trainer/pipelines/vision/output/
 Change anything here (e.g., epochs, batch size, hidden layer size), and your pipeline adjusts! Sample format of the file below
 ```
 BASE_DIR = ...
+SHARED_DATA_DIR = ...
 TRAIN_CSV = ...
 INPUT_DIM = 784
 HIDDEN_DIM = 128
@@ -95,3 +112,18 @@ BATCH_SIZE = 64
 ... 
 ```
 2. `trainer/constants_batch_strategy.py`: All available batch strategies (labels and module paths) are defined here.
+
+3. `trainer/constants_datasets.py`: Holds specifications of different datasets, such as input dimensions and number of classes. Sample format of the file below
+```
+DATASET_SPECS = {
+     "mnist": {
+         "builder": "build_mnist",
+         "input_dim": 28 * 28,
+         "num_classes": 10,
+         "subdir": "vision/MNIST",
+    },
+    # add more …
+}
+
+... 
+```
