@@ -29,3 +29,15 @@ def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **
     test  = CIFAR10Dataset(root, train=False, flatten=True,  download=download, normalize=normalize, augment=False)
     return train, test
 
+def build_cifar10(root, *, normalize=True, augment=True, download=False, in_channels=3, **kwargs):
+
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_cifar10 received flatten=True; remove that override.")
+    train = CIFAR10Dataset(root, train=True,  flatten=False,
+                           download=download, normalize=normalize, augment=augment,
+                           in_channels=in_channels, **kwargs)
+    test  = CIFAR10Dataset(root, train=False, flatten=False,
+                           download=download, normalize=normalize, augment=False,
+                           in_channels=in_channels, **kwargs)
+    return train, test
+

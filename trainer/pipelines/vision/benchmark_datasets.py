@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from trainer.model.vision.model import SimpleMLP
+from trainer.model.vision.cnn import SimpleCNN
 from trainer.pipelines.vision.vision import (
     train_model, aggregate_results, create_run_dir
 )
@@ -13,10 +14,14 @@ from trainer.constants_datasets import DATASET_SPECS
 from trainer.constants import SHARED_DATA_DIR
 
 # -------- config to tweak --------
-EPOCHS = 5
+EPOCHS = 2
 BATCH_SIZE = 64
-N_RUNS = 3
-DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # names must exist in DATASET_SPECS
+N_RUNS = 2
+
+#specify the list of datasets to benchmark.  All dataset keys must exist in DATASET_SPECS
+DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # for MLP
+#DATASETS = ["cifar10"]  # for CNN
+MODEL_CLS = SimpleMLP # SimpleCNN
 # -------------------------------------------
 
 def dataset_root(ds_name: str) -> str:
@@ -42,17 +47,7 @@ def save_summary(name, means, cis, file):
         )
     file.write(f"CPU Time: {means['time']:.2f}±{cis['time']:.2f} sec\n")
 
-def plot_metric(metric, ylabel, title, filename, means, cis, epochs_axis, run_dir):
-    plt.figure(figsize=(7, 5))
-    plt.plot(epochs_axis, means[metric], label="Random", linewidth=2)
-    plt.fill_between(
-        epochs_axis, means[metric] - cis[metric], means[metric] + cis[metric], alpha=0.2
-    )
-    plt.xlabel("Epoch"); plt.ylabel(ylabel); plt.title(title)
-    plt.legend(); plt.grid(True); plt.tight_layout()
-    plt.savefig(os.path.join(run_dir, filename)); plt.close()
-
-def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS):
+def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS, model_cls=SimpleMLP):
     run_dir = create_run_dir("Random")  # will create .../batching_random/run-###
     print(f"Saving results to {run_dir}")
 
@@ -64,7 +59,14 @@ def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS)
         # Build datasets and model 
         train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=ds_name)
 
-        model_ctor = lambda: build_model_for(ds_name, train_ds, model_cls=SimpleMLP)
+        #### tmp
+        # benchmark_datasets.py, right after build_dataset(...)
+        x0, y0 = train_ds[0]
+        print(f"[DEBUG] dataset={ds_name} sample_shape={tuple(x0.shape)} "
+              f"flatten_attr={getattr(train_ds, 'flatten', None)} "
+              f"type={type(train_ds).__name__}")
+        ### end tmp
+        model_ctor = lambda: build_model_for(ds_name, train_ds, model_cls=model_cls)
 
         # Run N times
         results = []
@@ -78,6 +80,8 @@ def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS)
                 batch_strategy=random_strategy,
                 seed=seed,
             )
+
+
             results.append({
                 "train_acc": train_acc, "test_acc": test_acc,
                 "train_loss": train_loss, "test_loss": test_loss,
@@ -107,4 +111,5 @@ def run_benchmark(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS)
     print(f"\nAll results saved to: {run_dir}")
 
 if __name__ == "__main__":
-    run_benchmark(DATASETS)
+#    run_benchmark(DATASETS, model_cls=SimpleMLP)
+    run_benchmark(DATASETS, model_cls=MODEL_CLS)

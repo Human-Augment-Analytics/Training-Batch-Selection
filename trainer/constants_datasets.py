@@ -23,6 +23,12 @@ DATASET_SPECS = {
         "num_classes": 10,
         "subdir": "vision/cifar10",
     },
+    "cifar10": {
+        "builder": "build_cifar10", 
+        "input_dim": 3 * 32 * 32,
+        "num_classes": 10,
+        "subdir": "vision/cifar10",
+    },
     # add more …
 }
 
