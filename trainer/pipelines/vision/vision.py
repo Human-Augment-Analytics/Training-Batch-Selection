@@ -8,6 +8,7 @@ from trainer.dataloader.vision_dataloader import MNISTCsvDataset
 
 # NEW import
 from trainer.constants_batch_strategy import BATCH_STRATEGIES
+from trainer.pipelines.vision.utils import shape_batch_for_model
 
 import os
 import time
@@ -48,6 +49,8 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
         for idxs in batch_iter:
             x, y = zip(*[train_ds[i] for i in idxs])
             x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
+            x = shape_batch_for_model(model,x)
+            x = x.to(DEVICE)
             y = torch.tensor(y).to(DEVICE)
             optimizer.zero_grad()
             y_pred = model(x)
@@ -87,7 +90,10 @@ def evaluate(model, ds):
     loss_fn = nn.CrossEntropyLoss()
     with torch.no_grad():
         for x, y in loader:
-            x = x.view(x.size(0), -1)
+            # x = x.view(x.size(0), -1) # replace with the below so images don't get flattened
+            x = shape_batch_for_model(model,x)
+            x = x.to(DEVICE, non_blocking=True)
+            y = y.to(DEVICE, non_blocking=True)
             y_pred = model(x)
             loss = loss_fn(y_pred, y)
             total_loss += loss.item() * x.size(0)
@@ -165,18 +171,6 @@ if __name__ == '__main__':
 
         # Save plots and summaries
         epochs_range = np.arange(1, EPOCHS+1)
-        def plot_metric(metric, ylabel, title, filename):
-            plt.figure(figsize=(7, 5))
-            plt.plot(epochs_range, means[metric], label=strategy_label, linewidth=2)
-            plt.fill_between(epochs_range, means[metric] - cis[metric], means[metric] + cis[metric], alpha=0.2)
-            plt.xlabel("Epoch")
-            plt.ylabel(ylabel)
-            plt.title(f"{title} - {strategy_label}")
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(os.path.join(run_dir, filename))
-            plt.close()
         plot_metric('test_acc', 'Test Accuracy', "Test Accuracy vs Epoch", "test_acc.png")
         plot_metric('train_acc', 'Train Accuracy', "Train Accuracy vs Epoch", "train_acc.png")
         plot_metric('train_loss', 'Train Loss', "Train Loss vs Epoch", "train_loss.png")
