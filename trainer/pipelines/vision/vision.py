@@ -32,6 +32,9 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
     optimizer = torch.optim.Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
 
+    # For gradient-based batching, we need a loss function with reduction='none'
+    loss_fn_per_sample = nn.CrossEntropyLoss(reduction='none')
+
     # Prepare loss history for smart batch
     per_sample_loss = np.zeros(len(train_ds))
     train_accs, test_accs, train_losses, test_losses = [],[],[],[]
@@ -39,9 +42,19 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
     for epoch in range(epochs):
         correct, n, running_loss = 0, 0, 0
         model.train()
-        # Choose batch_sampler for 'smart', else None
-        if batch_strategy.__name__ == "batch_sampler" and "loss_history" in batch_strategy.__code__.co_varnames:
-            batch_iter = batch_strategy(train_ds, batch_size, loss_history=per_sample_loss)
+        # Choose batch_sampler based on required parameters
+        if batch_strategy.__name__ == "batch_sampler":
+            # Check what parameters the batch strategy needs
+            params = batch_strategy.__code__.co_varnames
+            if "loss_history" in params:
+                # Smart batching (loss-based)
+                batch_iter = batch_strategy(train_ds, batch_size, loss_history=per_sample_loss)
+            elif "model" in params and "loss_fn" in params:
+                # Gradient-based batching (GraND)
+                batch_iter = batch_strategy(train_ds, batch_size, model=model, loss_fn=loss_fn_per_sample, device=DEVICE)
+            else:
+                # Default batching (fixed/random)
+                batch_iter = batch_strategy(train_ds, batch_size)
         else:
             batch_iter = batch_strategy(train_ds, batch_size)
         # Main batch loop
