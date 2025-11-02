@@ -1,6 +1,7 @@
 import importlib
 import os
 import torch
+import inspect
 from trainer.constants_datasets import DATASET_SPECS
 
 # One shared place to compute the on-disk path for a dataset name
@@ -37,73 +38,7 @@ def _infer_num_classes(dataset) -> int:
     _, y0 = dataset[0]
     return int(y0.max().item() + 1 if torch.is_tensor(y0) else int(y0) + 1)
 
-def build_model_for_org(name: str, train_ds, model_cls, hidden_dim: int = 128, **model_kwargs):
-    """Construct a model consistent with the model/dataset spec and sanity-check shapes."""
-    spec = DATASET_SPECS[name]
-    cfg_in = int(spec["input_dim"])
-    cfg_nc = int(spec["num_classes"])
-
-    inf_in = _infer_input_dim(train_ds)
-    inf_nc = _infer_num_classes(train_ds)
-
-    if cfg_in != inf_in:
-        raise ValueError(
-            f"[{name}] input_dim mismatch: spec={cfg_in}, inferred={inf_in}. "
-            "Check flatten/resize/transforms."
-        )
-    if cfg_nc != inf_nc:
-        print(f"Warning: [{name}] num_classes spec={cfg_nc}, inferred={inf_nc}")
-
-#    return SimpleMLP(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc)
-    # allow for model specification
-    return model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
-
-def build_model_for_a(name: str, train_ds, model_cls, hidden_dim: int = 128, **model_kwargs):
-    """Construct a model consistent with the model/dataset spec and sanity-check shapes."""
-    spec   = DATASET_SPECS[name]
-    cfg_in = int(spec["input_dim"])
-    cfg_nc = int(spec["num_classes"])
-
-    # infer from dataset
-    x0, _  = train_ds[0]
-    inf_nc = _infer_num_classes(train_ds)
-    flat_inferred = x0.numel()
-
-    # sanity checks (use flattened size so this works for both flat/CNN datasets)
-    if cfg_in != flat_inferred:
-        raise ValueError(
-            f"[{name}] input_dim mismatch: spec={cfg_in}, inferred(flattened)={flat_inferred}. "
-            "Check flatten/resize/transforms."
-        )
-    if cfg_nc != inf_nc:
-        print(f"Warning: [{name}] num_classes spec={cfg_nc}, inferred={inf_nc}")
-
-    # Route by model type
-    if getattr(model_cls, "expects_flat", True):
-        # MLP-style models get input_dim/hidden_dim
-        if x0.ndim != 1:
-            # Not fatal—your dataloader/model may flatten internally—but make it explicit.
-            print(f"Note: [{name}] dataset returns shape {tuple(x0.shape)}; model expects flat. "
-                  "Ensure flattening happens in dataset or forward().")
-        return model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
-    else:
-        # CNN-style models get in_channels only
-        if x0.ndim != 3:
-            raise ValueError(
-                f"[{name}] model expects images (C,H,W) but dataset returns shape {tuple(x0.shape)}. "
-                "Use a non-flattened image dataset/builder."
-            )
-        in_channels = int(x0.shape[0])  # (C,H,W)
-        # Optional: guard against mismatched explicit kwargs
-        if "in_channels" in model_kwargs and model_kwargs["in_channels"] != in_channels:
-            print(f"Warning: overriding provided in_channels={model_kwargs['in_channels']} with {in_channels} "
-                  f"based on dataset for [{name}].")
-            model_kwargs.pop("in_channels", None)
-        return model_cls(in_channels=in_channels, num_classes=cfg_nc, **model_kwargs)
-
-import inspect
-
-def build_model_for(name: str, train_ds, model_cls, hidden_dim: int = 128, **model_kwargs):
+def build_model_for_works(name: str, train_ds, model_cls, hidden_dim: int = 128, **model_kwargs):
     """Construct a model consistent with the dataset spec and the model's constructor signature."""
     spec   = DATASET_SPECS[name]
     cfg_in = int(spec["input_dim"])     # keep flattened for consistency in specs
@@ -154,3 +89,95 @@ def build_model_for(name: str, train_ds, model_cls, hidden_dim: int = 128, **mod
             f"Unable to construct {model_cls.__name__}. Expected ctor with either "
             "`input_dim` (for MLP) or `in_channels` (for CNN). Original error: {e}"
         )
+
+
+def build_model_for(
+    name: str,
+    train_ds,
+    model_cls,
+    *,
+    hidden_dim: int = 128,
+    verify_sample: bool = True,   # set False to skip runtime verification
+    **model_kwargs
+):
+    """
+    Construct a model using DATASET_SPECS as the ground truth.
+    We do not infer; we only verify (optionally) and give loud feedback.
+    """
+    spec = DATASET_SPECS[name]  # must contain num_classes; plus input_dim (MLP) or in_channels (CNN)
+
+    # ---- Required spec fields ----
+    if "num_classes" not in spec:
+        raise KeyError(f"[{name}] DATASET_SPECS must define 'num_classes'.")
+    cfg_nc = int(spec["num_classes"])
+
+    params = set(inspect.signature(model_cls).parameters.keys())
+    is_mlp = "input_dim" in params
+    is_cnn = "in_channels" in params
+
+    if is_mlp and "input_dim" not in spec:
+        raise KeyError(f"[{name}] model expects 'input_dim' but DATASET_SPECS lacks it.")
+    if is_cnn and "in_channels" not in spec:
+        raise KeyError(f"[{name}] model expects 'in_channels' but DATASET_SPECS lacks it.")
+
+    # ---- Build strictly from spec ----
+    if is_mlp:
+        cfg_in = int(spec["input_dim"])
+        print(f"[build_model_for] {name}: MLP -> input_dim={cfg_in}, num_classes={cfg_nc}")
+        model = model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
+
+    elif is_cnn:
+        cfg_c = int(spec["in_channels"])
+        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}")
+        model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
+
+    else:
+        # Fallback: choose based on spec keys, still with no inference
+        if "in_channels" in spec:
+            cfg_c = int(spec["in_channels"])
+            print(f"[build_model_for] {name}: CNN (fallback) -> in_channels={cfg_c}, num_classes={cfg_nc}")
+            model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
+        elif "input_dim" in spec:
+            cfg_in = int(spec["input_dim"])
+            print(f"[build_model_for] {name}: MLP (fallback) -> input_dim={cfg_in}, num_classes={cfg_nc}")
+            model = model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
+        else:
+            raise TypeError(
+                f"[{name}] DATASET_SPECS must include either 'in_channels' (for CNNs) "
+                f"or 'input_dim' (for MLPs)."
+            )
+
+    # ---- Optional verification (diagnostics only, no inference) ----
+    if verify_sample:
+        try:
+            x0, y0 = train_ds[0]
+            flat_inferred = int(x0.numel())
+            if is_mlp:
+                cfg_in = int(spec["input_dim"])
+                if flat_inferred != cfg_in:
+                    raise ValueError(
+                        f"[{name}] VERIFY: dataset sample flattened={flat_inferred}, "
+                        f"spec.input_dim={cfg_in}. "
+                        "Mismatch: check transforms/flatten setting or spec."
+                    )
+                if x0.ndim != 1:
+                    print(f"[{name}] NOTE: dataset sample shape {tuple(x0.shape)} but MLP expects flat; "
+                          "ensure flattening happens in shaper or dataset.")
+            else:  # CNN path
+                cfg_c = int(spec["in_channels"])
+                if x0.ndim != 3:
+                    raise ValueError(
+                        f"[{name}] VERIFY: dataset sample shape {tuple(x0.shape)} but CNN requires (C,H,W). "
+                        "Likely the dataset is flattened; build with flatten=False."
+                    )
+                if int(x0.shape[0]) != cfg_c:
+                    raise ValueError(
+                        f"[{name}] VERIFY: dataset channels={int(x0.shape[0])} but spec.in_channels={cfg_c}. "
+                        "Mismatch: adjust spec or dataset transforms."
+                    )
+        except Exception as e:
+            # Make verification failures loud and actionable
+            print(f"[build_model_for] VERIFICATION FAILED for {name}: {e}")
+            raise
+
+    return model

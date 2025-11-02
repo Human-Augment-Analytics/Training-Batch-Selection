@@ -47,11 +47,21 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
             batch_iter = batch_strategy(train_ds, batch_size)
         # Main batch loop
         for idxs in batch_iter:
-            x, y = zip(*[train_ds[i] for i in idxs])
-            x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
-            x = shape_batch_for_model(model,x)
-            x = x.to(DEVICE)
-            y = torch.tensor(y).to(DEVICE)
+
+            xs, ys = zip(*[train_ds[i] for i in idxs])
+            # Keep images as images; DO NOT .view(..., -1) here
+            x = torch.stack(xs).to(DEVICE)                 # (B,C,H,W) or (B,F) depending on dataset; don't flatten here
+            x = shape_batch_for_model(model, x)            # MLP -> flattens; CNN -> keeps/reshapes
+            # labels
+            # ys are already tensors in your dataset; stack is safer than torch.tensor(list_of_tensors)
+            y = torch.stack(ys).to(DEVICE, non_blocking=True)
+            
+
+            # x, y = zip(*[train_ds[i] for i in idxs])
+            # x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
+            # x = shape_batch_for_model(model,x)
+            # x = x.to(DEVICE)
+            # y = torch.tensor(y).to(DEVICE)
             optimizer.zero_grad()
             y_pred = model(x)
             losses = loss_fn(y_pred, y)
@@ -115,6 +125,7 @@ def create_run_dir(strategy_name):
 # ============ Experiment Runner ============
 
 def run_experiment(batch_strategy, strategy_label, train_ds, test_ds, model_constructor, epochs, batch_size, n_runs):
+    assert callable(model_constructor) and not isinstance(model_constructor, nn.Module), "model_constructor must be a zero-arg factory (callable), not a constructed nn.Module."
     results = []
     for seed in range(n_runs):
         print(f"\n[{strategy_label}] Run {seed+1}/{n_runs}")
@@ -171,6 +182,18 @@ if __name__ == '__main__':
 
         # Save plots and summaries
         epochs_range = np.arange(1, EPOCHS+1)
+        def plot_metric(metric, ylabel, title, filename):
+            plt.figure(figsize=(7, 5))
+            plt.plot(epochs_range, means[metric], label=strategy_label, linewidth=2)
+            plt.fill_between(epochs_range, means[metric] - cis[metric], means[metric] + cis[metric], alpha=0.2)
+            plt.xlabel("Epoch")
+            plt.ylabel(ylabel)
+            plt.title(f"{title} - {strategy_label}")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.path.join(run_dir, filename))
+            plt.close()
         plot_metric('test_acc', 'Test Accuracy', "Test Accuracy vs Epoch", "test_acc.png")
         plot_metric('train_acc', 'Train Accuracy', "Train Accuracy vs Epoch", "train_acc.png")
         plot_metric('train_loss', 'Train Loss', "Train Loss vs Epoch", "train_loss.png")

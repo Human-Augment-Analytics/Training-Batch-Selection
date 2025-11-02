@@ -1,5 +1,5 @@
 from trainer.dataloader.vision_dataloader import (
-    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFAR10Dataset
+    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified
 )
 
 # Each builder returns (train_ds, test_ds).
@@ -25,19 +25,46 @@ def build_qmnist(root, *, as_flat=True, normalize=True, download=False, **kwargs
 
 def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **kwargs):
     # flattened 3*32*32 inputs to fit the MLP
-    train = CIFAR10Dataset(root, train=True,  flatten=True,  download=download, normalize=normalize, augment=augment)
-    test  = CIFAR10Dataset(root, train=False, flatten=True,  download=download, normalize=normalize, augment=False)
+    GRAY_MEAN, GRAY_STD = [0.5], [0.5]
+    in_channels=1
+#    train = CIFAR10Dataset(root, train=True,  flatten=True,  download=download, normalize=normalize, augment=augment)
+#    test  = CIFAR10Dataset(root, train=False, flatten=True,  download=download, normalize=normalize, augment=False)
+    train = CIFARDatasetUnified(root, dataset='cifar10', train=True,  flatten=True,
+                           download=download, normalize=normalize, augment=augment,
+                           in_channels=in_channels, mean=GRAY_MEAN, std=GRAY_STD, **kwargs)
+    test  = CIFARDatasetUnified(root, dataset='cifar10', train=False, flatten=True,
+                           download=download, normalize=normalize, augment=False,
+                           in_channels=in_channels, mean=GRAY_MEAN, std=GRAY_STD, **kwargs)
     return train, test
 
 def build_cifar10(root, *, normalize=True, augment=True, download=False, in_channels=3, **kwargs):
 
     if kwargs.get("flatten", None) is True:
         raise ValueError("build_cifar10 received flatten=True; remove that override.")
-    train = CIFAR10Dataset(root, train=True,  flatten=False,
+    print (f'building a dataset with in_channels={in_channels}')
+    CIFAR10_MEAN = [0.4914, 0.4822, 0.4465]
+    CIFAR10_STD  = [0.2023, 0.1994, 0.2010]
+
+    train = CIFARDatasetUnified(root, dataset='cifar10', train=True,  flatten=False,
                            download=download, normalize=normalize, augment=augment,
-                           in_channels=in_channels, **kwargs)
-    test  = CIFAR10Dataset(root, train=False, flatten=False,
+                           in_channels=in_channels, mean=CIFAR10_MEAN, std=CIFAR10_STD, **kwargs)
+    test  = CIFARDatasetUnified(root, dataset='cifar10', train=False, flatten=False,
                            download=download, normalize=normalize, augment=False,
-                           in_channels=in_channels, **kwargs)
+                           in_channels=in_channels, mean=CIFAR10_MEAN, std=CIFAR10_STD, **kwargs)
+    return train, test
+
+def build_cifar100(root, *, normalize=True, augment=True, download=False, in_channels=3, **kwargs):
+
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_cifar100 received flatten=True; remove that override.")
+    CIFAR100_MEAN = [0.5071, 0.4867, 0.4408]
+    CIFAR100_STD  = [0.2675, 0.2565, 0.2761]
+
+    train = CIFARDatasetUnified(root, dataset='cifar100', train=True,  flatten=False,
+                           download=download, normalize=normalize, augment=augment,
+                           in_channels=in_channels, mean=CIFAR100_MEAN, std=CIFAR100_STD, **kwargs)
+    test  = CIFARDatasetUnified(root, dataset='cifar100', train=False, flatten=False,
+                           download=download, normalize=normalize, augment=False,
+                           in_channels=in_channels, mean=CIFAR100_MEAN, std=CIFAR100_STD, **kwargs)
     return train, test
 

@@ -2,6 +2,7 @@
 import inspect, math, torch, torch.nn as nn
 import matplotlib.pyplot as plt
 
+
 def _infer_cnn_in_channels(model):
     # Try to read the first Conv2d’s in_channels if available
     for m in model.modules():
@@ -55,15 +56,3 @@ def shape_batch_for_model(model, x):
     # Fallback if the model constructor doesn’t advertise either param
     return x if x.dim() > 2 else x.view(x.size(0), -1)
 
-def plot_metric(metric, ylabel, title, filename):
-    plt.figure(figsize=(7, 5))
-    plt.plot(epochs_range, means[metric], label=strategy_label, linewidth=2)
-    plt.fill_between(epochs_range, means[metric] - cis[metric], means[metric] + cis[metric], alpha=0.2)
-    plt.xlabel("Epoch")
-    plt.ylabel(ylabel)
-    plt.title(f"{title} - {strategy_label}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(run_dir, filename))
-    plt.close()
