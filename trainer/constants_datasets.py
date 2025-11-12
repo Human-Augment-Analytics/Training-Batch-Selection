@@ -3,7 +3,7 @@ DATASET_SPECS = {
          "builder": "build_mnist",
          "input_dim": 28 * 28,
          "num_classes": 10,
-         "subdir": "vision/MNIST",
+         "subdir": "vision",  # torchvision MNIST creates MNIST/ subdirectory automatically
     },
      "mnist_csv": {
          "builder": "build_mnist_csv",
@@ -18,7 +18,7 @@ DATASET_SPECS = {
         "subdir": "vision/qmnist",
     },
     "cifar10_flat": {
-        "builder": "build_cifar10_flat", 
+        "builder": "build_cifar10_flat",
         "input_dim": 3 * 32 * 32,
         "num_classes": 10,
         "subdir": "vision/cifar10",

@@ -5,9 +5,17 @@ from trainer.constants import (
 )
 from trainer.model.vision.model import SimpleMLP
 from trainer.dataloader.vision_dataloader import MNISTCsvDataset
-
-# NEW import
 from trainer.constants_batch_strategy import BATCH_STRATEGIES
+
+# Optional: config-driven model/optimizer selection
+try:
+    from trainer.constants_models import (
+        ACTIVE_VISION_MODEL, ACTIVE_VISION_TRAINING, get_training_config
+    )
+    from trainer.factories import create_model, create_optimizer
+    HAS_CONFIG_SYSTEM = True
+except ImportError:
+    HAS_CONFIG_SYSTEM = False
 
 import os
 import time
@@ -25,11 +33,17 @@ test_ds = MNISTCsvDataset(TEST_CSV)
 
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
-                loss_kwargs={}, batch_kwargs={}, seed=None):
+                loss_kwargs={}, batch_kwargs={}, seed=None, optimizer_name="Adam"):
     if seed is not None:
         np.random.seed(seed)
         torch.manual_seed(seed)
-    optimizer = torch.optim.Adam(model.parameters())
+
+    # Use config system if available
+    if HAS_CONFIG_SYSTEM and optimizer_name != "Adam":
+        optimizer = create_optimizer(optimizer_name, model.parameters())
+    else:
+        optimizer = torch.optim.Adam(model.parameters())
+
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
 
     # Prepare loss history for smart batch
@@ -146,19 +160,24 @@ def aggregate_results(results):
 # ============ MAIN ============
 
 if __name__ == '__main__':
-    # Loop over batch strategies from config/constants
+    # Optional: use config-driven model selection
+    # To switch models, edit ACTIVE_VISION_MODEL in trainer/constants_models.py
+    if HAS_CONFIG_SYSTEM:
+        model_constructor = lambda: create_model(ACTIVE_VISION_MODEL)
+        print(f"Using config model: {ACTIVE_VISION_MODEL}")
+    else:
+        model_constructor = SimpleMLP
+
+    # Loop over batch strategies
     for strategy_label, strategy_path in BATCH_STRATEGIES.items():
-        print(f"\n==== Running with batching strategy: {strategy_label} ====")
-        # Import batching function dynamically
+        print(f"\n==== Batching strategy: {strategy_label} ====")
         module_name = f"trainer.batching.vision_batching.{strategy_path}".replace("/", ".").replace("\\", ".")
         batch_module = importlib.import_module(module_name)
         batch_strategy = batch_module.batch_sampler
 
         run_dir = create_run_dir(strategy_label)
-        means, cis = None, None
-
         results = run_experiment(
-            batch_strategy, strategy_label, train_ds, test_ds, SimpleMLP,
+            batch_strategy, strategy_label, train_ds, test_ds, model_constructor,
             EPOCHS, BATCH_SIZE, N_RUNS
         )
         means, cis = aggregate_results(results)

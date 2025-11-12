@@ -1,5 +1,23 @@
+# Deep Learning Framework
+torch
+torchvision
+
+# HuggingFace Libraries
 datasets
 transformers
-torch
-python-dotenv
+
+# Data Science & Visualization
 matplotlib
+scipy
+numpy
+pandas
+
+# Configuration & Environment
+python-dotenv
+pyyaml
+
+# Image Processing
+Pillow
+
+# Dataset Downloads (optional)
+kaggle

@@ -1,0 +1,6 @@
+Epoch 1: train_acc=0.9033±0.0021, test_acc=0.9400±0.0029, train_loss=0.3600±0.0062
+Epoch 2: train_acc=0.9515±0.0015, test_acc=0.9575±0.0034, train_loss=0.1678±0.0052
+Epoch 3: train_acc=0.9659±0.0008, test_acc=0.9637±0.0040, train_loss=0.1172±0.0031
+Epoch 4: train_acc=0.9743±0.0007, test_acc=0.9669±0.0037, train_loss=0.0886±0.0022
+Epoch 5: train_acc=0.9797±0.0006, test_acc=0.9694±0.0026, train_loss=0.0693±0.0017
+CPU Time: 55.21±13.15 sec

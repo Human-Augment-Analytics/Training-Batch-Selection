@@ -1,0 +1,7 @@
+__pycache__/
+.claude/
+.idea/
+datasets/
+CLAUDE.md
+tbs/
+trainer/data/vision/*.csv

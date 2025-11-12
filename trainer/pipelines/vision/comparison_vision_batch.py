@@ -15,8 +15,12 @@ def load_summary(run_dir):
         if 'Epoch' in line:
             for metric in ["train_acc", "test_acc", "train_loss"]:
                 try:
-                    val, ci = [float(s) for s in
-                                line.split(f"{metric}=")[1].split("±")]
+                    # Split by metric name, then by ±
+                    parts = line.split(f"{metric}=")[1].split("±")
+                    val = float(parts[0])
+                    # CI value might have comma after it, so take only the first part
+                    ci_str = parts[1].split(",")[0].strip()
+                    ci = float(ci_str)
                     means[metric].append(val)
                     cis[metric].append(ci)
                 except Exception:
@@ -28,8 +32,15 @@ def find_latest_run_path(strategy_name):
     runs = sorted([d for d in os.listdir(strat_dir) if d.startswith('run-')])
     if not runs:
         raise RuntimeError(f"No run-XXX directories found for {strategy_name}")
-    latest = runs[-1]
-    return os.path.join(strat_dir, latest)
+
+    # Find the latest run that has a summary.txt file (completed run)
+    for run in reversed(runs):
+        run_path = os.path.join(strat_dir, run)
+        summary_file = os.path.join(run_path, "summary.txt")
+        if os.path.exists(summary_file):
+            return run_path
+
+    raise RuntimeError(f"No completed runs found for {strategy_name} (no summary.txt files)")
 
 def plot_comparison(pair, epoch_count=EPOCHS):
     epochs = np.arange(1, epoch_count+1)

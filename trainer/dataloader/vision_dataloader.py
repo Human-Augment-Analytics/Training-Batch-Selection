@@ -1,6 +1,8 @@
 import torch
 import pandas as pd
 import numpy as np
+import os
+from pathlib import Path
 from torchvision import transforms, datasets
 
 from trainer.dataloader.base_dataloader import BaseDataset
@@ -15,8 +17,26 @@ class MNISTCsvDataset(BaseDataset):
         self._load_data()
 
     def _load_data(self):
-        # (Optional) assert the extension
-        # assert self.csv_path.endswith(".csv"), "Expected a .csv file"
+        # Auto-convert if CSV doesn't exist
+        if not os.path.exists(self.csv_path):
+            print(f"⚠️  CSV not found: {self.csv_path}")
+            print("🔄 Auto-converting MNIST to CSV format...")
+
+            # Import and run auto-converter
+            from trainer.dataloader.auto_convert_csv import ensure_mnist_csv
+            from trainer.constants import DATASETS_ROOT
+
+            train_csv, test_csv = ensure_mnist_csv(DATASETS_ROOT)
+
+            # Check if this is train or test CSV we need
+            if "train" in self.csv_path:
+                self.csv_path = train_csv
+            else:
+                self.csv_path = test_csv
+
+            print(f"✔️ Using: {self.csv_path}")
+
+        # Load CSV data
         data = pd.read_csv(self.csv_path).values
         self.X = data[:, 1:].astype(np.float32) / 255.0
         self.y = data[:, 0].astype(np.int64)

@@ -16,7 +16,7 @@ from trainer.constants import SHARED_DATA_DIR
 EPOCHS = 5
 BATCH_SIZE = 64
 N_RUNS = 3
-DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # names must exist in DATASET_SPECS
+DATASETS = ["mnist_csv", "qmnist", "cifar10_flat"]  # names must exist in DATASET_SPECS
 # -------------------------------------------
 
 def dataset_root(ds_name: str) -> str:
