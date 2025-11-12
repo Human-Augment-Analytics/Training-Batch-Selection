@@ -8,6 +8,7 @@ from trainer.dataloader.vision_dataloader import MNISTCsvDataset
 
 # NEW import
 from trainer.constants_batch_strategy import BATCH_STRATEGIES
+from trainer.pipelines.vision.utils import shape_batch_for_model
 
 import os
 import time
@@ -46,9 +47,21 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
             batch_iter = batch_strategy(train_ds, batch_size)
         # Main batch loop
         for idxs in batch_iter:
-            x, y = zip(*[train_ds[i] for i in idxs])
-            x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
-            y = torch.tensor(y).to(DEVICE)
+
+            xs, ys = zip(*[train_ds[i] for i in idxs])
+            # Keep images as images; DO NOT .view(..., -1) here
+            x = torch.stack(xs).to(DEVICE)                 # (B,C,H,W) or (B,F) depending on dataset; don't flatten here
+            x = shape_batch_for_model(model, x)            # MLP -> flattens; CNN -> keeps/reshapes
+            # labels
+            # ys are already tensors in your dataset; stack is safer than torch.tensor(list_of_tensors)
+            y = torch.stack(ys).to(DEVICE, non_blocking=True)
+            
+
+            # x, y = zip(*[train_ds[i] for i in idxs])
+            # x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
+            # x = shape_batch_for_model(model,x)
+            # x = x.to(DEVICE)
+            # y = torch.tensor(y).to(DEVICE)
             optimizer.zero_grad()
             y_pred = model(x)
             losses = loss_fn(y_pred, y)
@@ -87,7 +100,10 @@ def evaluate(model, ds):
     loss_fn = nn.CrossEntropyLoss()
     with torch.no_grad():
         for x, y in loader:
-            x = x.view(x.size(0), -1)
+            # x = x.view(x.size(0), -1) # replace with the below so images don't get flattened
+            x = shape_batch_for_model(model,x)
+            x = x.to(DEVICE, non_blocking=True)
+            y = y.to(DEVICE, non_blocking=True)
             y_pred = model(x)
             loss = loss_fn(y_pred, y)
             total_loss += loss.item() * x.size(0)
@@ -109,6 +125,7 @@ def create_run_dir(strategy_name):
 # ============ Experiment Runner ============
 
 def run_experiment(batch_strategy, strategy_label, train_ds, test_ds, model_constructor, epochs, batch_size, n_runs):
+    assert callable(model_constructor) and not isinstance(model_constructor, nn.Module), "model_constructor must be a zero-arg factory (callable), not a constructed nn.Module."
     results = []
     for seed in range(n_runs):
         print(f"\n[{strategy_label}] Run {seed+1}/{n_runs}")

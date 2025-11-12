@@ -70,32 +70,80 @@ class QMNISTDataset(BaseDataset):
             x = torch.flatten(x)
         return x, torch.tensor(y, dtype=torch.int64)
 
-class CIFAR10Dataset(BaseDataset):
-    def __init__(self, root:str, train:bool=True, flatten:bool=True, download:bool=False, normalize:bool=True, augment:bool=False):
+class CIFARDatasetUnified(BaseDataset):
+    """
+    Unified CIFAR dataset.
+    - dataset: 'cifar10' or 'cifar100'
+    - in_channels: 3 (RGB) or 1 (grayscale)
+    - augment: random crop + horizontal flip for train
+    - normalize: uses canonical stats by default (overridable with mean/std)
+    - flatten: default False (prefer shaping per model)
+    Exposes: .num_classes, .class_names, .in_channels
+    """
+    def __init__(
+        self,
+        root: str,
+        *,
+        train: bool = True,
+        dataset: str = "cifar10",
+        download: bool = False,
+        normalize: bool = True,
+        augment: bool = False,
+        in_channels: int = 3,
+#        mean: Optional[Sequence[float]] = None,
+#        std: Optional[Sequence[float]] = None,
+        mean: list[float] = None,
+        std: list[float] = None,
+        flatten: bool = False,
+        target_transform=None,  # keep hook for fine->coarse mapping, etc.
+    ):
+
+        print(f'[CIFARDatasetUnified]: constructing {dataset} dataset (train={train}) with in_channels={in_channels} and flatten={flatten}')
+        dataset = dataset.lower()
+        if dataset not in {"cifar10", "cifar100"}:
+            raise ValueError("dataset must be 'cifar10' or 'cifar100'")
+        if in_channels not in (1, 3):
+            raise ValueError("in_channels must be 1 or 3")
+
+        # --- Transforms ---
         t = []
         if augment and train:
             t += [
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomCrop(32, padding=4),
-                ]
+            ]
+        if in_channels == 1:
+            # do this before ToTensor so it outputs 1 channel
+            t.append(transforms.Grayscale(num_output_channels=1))
         t.append(transforms.ToTensor())
-        if normalize:
-            t.append(transforms.Normalize(
-                mean=[0.4914, 0.4822, 0.4465],
-                std = [0.2023, 0.1994, 0.2010],
-            ))
 
-        # collect all the transforms that will be applied
+        if normalize:
+#            mean, std = _pick_stats(dataset, in_channels, mean, std)
+            if len(mean) != in_channels or len(std) != in_channels:
+                raise ValueError("mean/std length must match in_channels")
+            t.append(transforms.Normalize(mean=mean, std=std))
+
         tfm = transforms.Compose(t)
 
-        self.base = datasets.CIFAR10(root=root, train=train, download=download, transform=tfm)
-        self.flatten = flatten
+        # --- Base dataset ---
+        if dataset == "cifar10":
+            base = datasets.CIFAR10(root=root, train=train, download=download, transform=tfm, target_transform=target_transform)
+            self.num_classes = 10
+            self.class_names = list(base.classes)  # ['airplane', 'automobile', ...]
+        else:
+            base = datasets.CIFAR100(root=root, train=train, download=download, transform=tfm, target_transform=target_transform)
+            self.num_classes = 100
+            self.class_names = list(base.classes)  # 100 fine labels
 
-    def __len__(self) -> int:
+        self.base = base
+        self.flatten = flatten
+        self.in_channels = in_channels
+
+    def __len__(self):
         return len(self.base)
 
     def __getitem__(self, idx):
-        x,y = self.base[idx]
+        x, y = self.base[idx]            # x: (C, 32, 32) float32
         if self.flatten:
-            x = torch.flatten(x)
-        return x.to(torch.float32), torch.tensor(y, dtype=torch.int64)
+            x = torch.flatten(x)         # -> (C*32*32,)
+        return x, torch.tensor(y, dtype=torch.int64)
