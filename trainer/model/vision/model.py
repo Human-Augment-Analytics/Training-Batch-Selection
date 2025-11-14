@@ -21,6 +21,7 @@ class SimpleCNN(nn.Module):
 
     def __init__(self, in_channels=1, num_classes=10):
         super().__init__()
+        print (f'[model.py]: building a CNN with in_channels={in_channels} and num_classes={num_classes}')
         self.in_channels=in_channels
         self.features = nn.Sequential(
             nn.Conv2d(in_channels, 32, 3, padding=1), nn.ReLU(),
