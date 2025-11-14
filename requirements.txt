@@ -3,3 +3,5 @@ transformers
 torch
 python-dotenv
 matplotlib
+tqdm>=4.65
+ipywidgets>=8.0
