@@ -60,8 +60,13 @@ python simple_dataset_loader.py download mnist --yes
 ### Run Vision Experiments
 
 ```bash
-# Train with all batch strategies (Random, Fixed, Smart)
+# Train with all batch strategies (default: MNIST)
 python -m trainer.pipelines.vision.vision
+
+# Train with different datasets
+python -m trainer.pipelines.vision.vision --dataset qmnist_csv    # QMNIST
+python -m trainer.pipelines.vision.vision --dataset cifar10_csv   # CIFAR-10
+python -m trainer.pipelines.vision.vision --dataset cifar100_csv  # CIFAR-100
 
 # Compare two strategies
 python -m trainer.pipelines.vision.comparison_vision_batch
@@ -73,7 +78,8 @@ python -m trainer.pipelines.vision.benchmark_datasets
 **Important Notes:**
 - Always use `-m` flag when running modules (treats code as package)
 - Omit `.py` extension (use `vision` not `vision.py`)
-- MNIST CSVs are **automatically generated** when needed - no manual conversion required!
+- Dataset CSVs are **automatically generated** when needed - no manual conversion required!
+- Supports: `mnist_csv`, `qmnist_csv`, `cifar10_csv`, `cifar100_csv`
 
 ### Check Results
 
@@ -171,6 +177,55 @@ python -m trainer.pipelines.vision.benchmark_datasets
 - Edit `DATASETS` list at top of `benchmark_datasets.py`
 - Currently supports: `mnist_csv`, `mnist`, `qmnist`, `cifar10_flat`
 - Generates per-dataset plots and summaries
+
+#### Switching Datasets
+
+You can easily switch between datasets using either the config file or command-line arguments:
+
+**Method 1: Edit Config File (Permanent)**
+
+Edit `trainer/constants.py` and change the `ACTIVE_DATASET` constant:
+
+```python
+# Change this line (around line 58):
+ACTIVE_DATASET = "mnist_csv"  # Default
+
+# To one of these:
+ACTIVE_DATASET = "qmnist_csv"    # QMNIST dataset
+ACTIVE_DATASET = "cifar10_csv"   # CIFAR-10 dataset
+ACTIVE_DATASET = "cifar100_csv"  # CIFAR-100 dataset
+```
+
+Then run normally:
+```bash
+python -m trainer.pipelines.vision.vision
+```
+
+**Method 2: Command-Line Override (Quick Switching)**
+
+Override the default without editing files:
+
+```bash
+# Use MNIST (default)
+python -m trainer.pipelines.vision.vision
+
+# Use QMNIST
+python -m trainer.pipelines.vision.vision --dataset qmnist_csv
+
+# Use CIFAR-10
+python -m trainer.pipelines.vision.vision --dataset cifar10_csv
+
+# Use CIFAR-100
+python -m trainer.pipelines.vision.vision --dataset cifar100_csv
+```
+
+**Supported Datasets:**
+- `mnist_csv` - MNIST (784 features, 10 classes) ~123 MB CSV
+- `qmnist_csv` - QMNIST (784 features, 10 classes) ~314 MB CSV
+- `cifar10_csv` - CIFAR-10 (3072 features, 10 classes) ~615 MB CSV
+- `cifar100_csv` - CIFAR-100 (3072 features, 100 classes) ~615 MB CSV
+
+**Note:** CSV files are automatically downloaded and converted on first use. The conversion process takes 30 seconds (MNIST) to 3 minutes (CIFAR) and only happens once.
 
 ### Output Example
 
@@ -621,40 +676,86 @@ For reproducibility:
 
 ---
 
-## Automatic MNIST CSV Conversion
+## Automatic CSV Conversion (MNIST, QMNIST, CIFAR-10, CIFAR-100)
 
-MNIST CSV files are **automatically generated** when needed - no manual conversion required!
+CSV files are **automatically generated** when needed - no manual conversion required!
+
+### Supported Datasets
+
+All four vision datasets support automatic CSV conversion:
+
+| Dataset | Features | Classes | CSV Size | Conversion Time |
+|---------|----------|---------|----------|-----------------|
+| MNIST | 784 (28×28 grayscale) | 10 | ~123 MB | ~30 seconds |
+| QMNIST | 784 (28×28 grayscale) | 10 | ~314 MB | ~1 minute |
+| CIFAR-10 | 3,072 (32×32×3 RGB) | 10 | ~615 MB | ~2-3 minutes |
+| CIFAR-100 | 3,072 (32×32×3 RGB) | 100 | ~615 MB | ~2-3 minutes |
 
 ### How It Works
 
-1. **Checks** if CSV files already exist
-2. If **not found**: Automatically converts from torchvision MNIST format
+1. **Checks** if CSV files already exist in either location
+2. If **not found**: Automatically downloads and converts from torchvision format
 3. **Saves** CSVs to both required locations:
-   - `datasets/vision/MNIST/csv/` (for benchmark_datasets)
+   - `datasets/vision/{DATASET}/csv/` (for benchmark_datasets)
    - `trainer/data/vision/` (for vision.py)
 4. **Loads** the data seamlessly
+5. **Caches** - Subsequent runs load instantly from CSV
 
 ### Example Output
 
 ```bash
 # First time use (no CSVs exist)
-python -m trainer.pipelines.vision.vision
+python -m trainer.pipelines.vision.vision --dataset cifar10_csv
 
 # Output:
-# ⚠️  CSV not found: trainer/data/vision/mnist_train.csv
-# 🔄 Auto-converting MNIST to CSV format...
-# ✔️ Loaded MNIST: 60000 train, 10000 test
-# ✔️ Saved CSVs to: datasets/vision/MNIST/csv
-# ✔️ Saved CSVs to: trainer/data/vision
-# 🎉 CSV conversion complete!
+# Warning: CSV not found: datasets/vision/cifar10/csv/cifar10_train.csv
+# Auto-converting CIFAR10 to CSV format...
+# Note: This will create ~615 MB of CSV files
+# Downloaded CIFAR10: 50000 train, 10000 test
+#   Converting training set (50000 samples)...
+#     Progress: 10000/50000
+#     Progress: 20000/50000
+#     ...
+#   Converting test set (10000 samples)...
+# Saved CSVs to: datasets/vision/cifar10/csv
+# Saved CSVs to: trainer/data/vision
+# CSV conversion complete!
 ```
+
+### Manual Conversion (Optional)
+
+If you prefer to convert datasets manually:
+
+```bash
+# Convert specific dataset to CSV
+python -m trainer.dataloader.auto_convert_csv mnist datasets/
+python -m trainer.dataloader.auto_convert_csv qmnist datasets/
+python -m trainer.dataloader.auto_convert_csv cifar10 datasets/
+python -m trainer.dataloader.auto_convert_csv cifar100 datasets/
+
+# Or use default datasets root
+python -m trainer.dataloader.auto_convert_csv cifar10
+```
+
+### CSV Format
+
+**MNIST/QMNIST:**
+- Columns: `label, pixel0, pixel1, ..., pixel783` (785 total)
+- Values: 0-255 (normalized to [0,1] on load)
+
+**CIFAR-10/CIFAR-100:**
+- Columns: `label, pixel0, pixel1, ..., pixel3071` (3,073 total)
+- Values: 0-255 (flattened RGB, normalized to [0,1] on load)
+- Order: Row-major RGB (R0,G0,B0,R1,G1,B1,...)
 
 ### Benefits
 
 - **Zero Configuration**: No manual setup required
 - **Intelligent**: Only converts when necessary
-- **Fast**: Skips conversion if CSVs exist
-- **Transparent**: Shows what it's doing
+- **Fast**: Skips conversion if CSVs exist (cached)
+- **Transparent**: Shows progress and status
+- **Universal**: Works for all vision datasets
+- **Automatic Download**: Downloads source dataset if missing
 
 ---
 
