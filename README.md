@@ -1,47 +1,59 @@
 # Training Batch Selection Research Project
 
-A research project for evaluating and comparing different **batch selection strategies** during neural network training. Instead of using standard random batching, this project experiments with different ways to select which samples go into each training batch (e.g., prioritizing high-loss samples).
+A research project for evaluating and comparing different **batch selection strategies** during neural network training. Instead of using standard random batching, this project experiments with different ways to select which samples go into each training batch.
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [Vision Pipeline (MNIST)](#vision-pipeline-mnist)
-- [Dataset Management](#dataset-management)
-- [Configuration System](#configuration-system)
-- [Adding Custom Components](#adding-custom-components)
-- [NLP Pipeline (Pretraining)](#nlp-pipeline-pretraining)
-- [Requirements](#requirements)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.9-red.svg)](https://pytorch.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 
 ---
 
-## Overview
+## 📋 Table of Contents
 
-The codebase supports two main pipelines:
-
-1. **Vision Pipeline** (MNIST) - Complete implementation with multiple batch strategies
-2. **Text/NLP Pipeline** (Pretraining) - Under development
-
-### Key Features
-
-- **Plugin-based Batch Strategy System** - Add new strategies without touching core code
-- **Config-driven Design** - Change hyperparameters via config files
-- **Automated Experiment Tracking** - All metrics and plots saved automatically
-- **Dataset Factory Pattern** - Unified dataset loading interface
-- **Multi-dataset Benchmarking** - Compare performance across different datasets
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [Usage Examples](#-usage-examples)
+- [Configuration](#️-configuration)
+- [Batch Strategies](#-batch-strategies)
+- [Datasets](#-datasets)
+- [GPU Optimization](#-gpu-optimization)
+- [Output Management](#-output-management)
+- [Adding New Components](#-adding-new-components)
+- [Documentation](#-documentation)
+- [Troubleshooting](#-troubleshooting)
 
 ---
 
-## Quick Start
+## ✨ Features
+
+### Core Capabilities
+- **🔄 Multiple Batch Strategies**: Random, Fixed, Smart (loss-based prioritization)
+- **🚀 GPU Auto-Detection**: Automatically uses CUDA if available, falls back to CPU seamlessly
+- **📊 Multi-Dataset Support**: MNIST, QMNIST, CIFAR-10, CIFAR-100 with automatic CSV conversion
+- **📈 Statistical Analysis**: Multi-run experiments with mean ± 95% confidence intervals
+- **📉 Automated Plotting**: Training/test accuracy and loss curves with CI bands
+- **🔌 Plugin Architecture**: Easy to add new strategies, datasets, and models
+- **⚙️ Config-Driven**: All hyperparameters centralized in configuration files
+
+### Task Pipelines
+1. **Vision Pipeline** (MNIST/CIFAR) - ✅ Fully implemented
+2. **NLP Pipeline** (Transformer pretraining) - 🚧 Under development
+
+---
+
+## 🚀 Quick Start
 
 ### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/Human-Augment-Analytics/Training-Batch-Selection.git
-
 cd Training-Batch-Selection
+
+# Create virtual environment
+python3 -m venv tbs
+source tbs/bin/activate  # On Windows: tbs\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -51,896 +63,290 @@ pip install -r requirements.txt
 
 ```bash
 # List available datasets
-python simple_dataset_loader.py list
+python scripts/download_datasets.py list
 
 # Download specific dataset
-python simple_dataset_loader.py download mnist --yes
+python scripts/download_datasets.py download mnist --yes
+python scripts/download_datasets.py download cifar10 --yes
 ```
 
-### Run Vision Experiments
+### Run Your First Experiment
 
 ```bash
-# Train with all batch strategies (default: MNIST)
-python -m trainer.pipelines.vision.vision
+# Run vision experiments with all batch strategies (default: MNIST)
+python -m tasks.vision.run_experiment
 
-# Train with different datasets
-python -m trainer.pipelines.vision.vision --dataset qmnist_csv    # QMNIST
-python -m trainer.pipelines.vision.vision --dataset cifar10_csv   # CIFAR-10
-python -m trainer.pipelines.vision.vision --dataset cifar100_csv  # CIFAR-100
-
-# Compare two strategies
-python -m trainer.pipelines.vision.comparison_vision_batch
-
-# Benchmark across multiple datasets
-python -m trainer.pipelines.vision.benchmark_datasets
+# Run with different datasets
+python -m tasks.vision.run_experiment --dataset cifar10_csv
+python -m tasks.vision.run_experiment --dataset qmnist_csv
 ```
 
-**Important Notes:**
-- Always use `-m` flag when running modules (treats code as package)
-- Omit `.py` extension (use `vision` not `vision.py`)
-- Dataset CSVs are **automatically generated** when needed - no manual conversion required!
-- Supports: `mnist_csv`, `qmnist_csv`, `cifar10_csv`, `cifar100_csv`
-
-### Check Results
-
-Results are saved to `trainer/pipelines/vision/output/`:
-- Each strategy gets its own folder: `batching_{strategy}/run-XXX/`
-- Contains: `summary.txt`, accuracy/loss plots
+**That's it!** The code will:
+- ✅ Auto-detect GPU and use it if available
+- ✅ Auto-convert datasets to CSV if needed
+- ✅ Train models with all batch strategies
+- ✅ Generate plots and statistics
+- ✅ Save results to `outputs/vision/{dataset}/`
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 Training-Batch-Selection/
-├── simple_dataset_loader.py       # Dataset downloader (config-driven)
-├── download_engines.py             # Generic download engines
-├── dataset_config_enhanced.yaml    # Dataset configurations
-├── trainer/
-│   ├── batching/
-│   │   └── vision_batching/        # Batch selection strategies
-│   │       ├── random_batch.py     # Baseline: random sampling
-│   │       ├── fixed_batch.py      # Sequential batching
-│   │       └── smart_batch.py      # Loss-based prioritization
-│   ├── dataloader/
-│   │   ├── vision_dataloader.py    # Vision dataset classes
-│   │   ├── factory.py              # Dataset factory functions
-│   │   └── builders.py             # Dataset builders
-│   ├── model/
-│   │   ├── vision/model.py         # SimpleMLP for MNIST
-│   │   └── nlp/                    # Transformer architecture
-│   ├── pipelines/
-│   │   ├── vision/
-│   │   │   ├── vision.py           # Main training loop
-│   │   │   ├── comparison_vision_batch.py
-│   │   │   └── benchmark_datasets.py
-│   │   └── pretraining/
-│   │       └── run_pretraining.py
-│   ├── constants.py                # Hyperparameters
-│   ├── constants_batch_strategy.py # Batch strategy registry
-│   └── constants_datasets.py       # Dataset specifications
-└── datasets/                       # Downloaded datasets
-    ├── vision/
-    └── nlp/
+├── config/                    # 🔧 All configuration
+│   ├── base.py               # Device, paths, GPU auto-detect
+│   ├── vision.py             # Vision hyperparameters
+│   ├── nlp.py                # NLP hyperparameters
+│   ├── datasets.py           # Dataset specifications
+│   ├── batch_strategies.py   # Strategy registry
+│   ├── models.py             # Model registry
+│   └── dataset_config_enhanced.yaml  # Dataset download configs
+│
+├── tasks/                     # 🎯 Task-specific code
+│   ├── vision/               # Vision classification
+│   │   ├── models/           # SimpleMLP
+│   │   ├── datasets/         # MNIST, CIFAR loaders + factory
+│   │   ├── batch_strategies/ # Random, Fixed, Smart
+│   │   ├── train.py          # Training loop
+│   │   ├── evaluate.py       # Evaluation
+│   │   └── run_experiment.py # Main runner
+│   │
+│   └── nlp/                  # Language modeling (under development)
+│       ├── models/           # TinyLLM Transformer
+│       ├── datasets/         # Tokenized data loaders
+│       └── run_pretraining.py
+│
+├── core/                      # 🛠️ Shared utilities
+│   ├── factories/            # Model/optimizer factories
+│   ├── metrics/              # Statistics & plotting (future)
+│   └── utils/                # General utilities (future)
+│
+├── scripts/                   # 📜 Utility scripts
+│   ├── download_datasets.py  # Dataset downloader
+│   ├── check_device.py       # GPU/CPU checker
+│   └── download_engines.py   # Download engines
+│
+├── datasets/                  # 💾 Raw datasets (auto-created)
+├── outputs/                   # 📊 Training outputs (auto-created)
+├── docs/                      # 📚 Documentation
+├── legacy/                    # 🗄️ Old code (reference)
+│
+├── .env                       # Environment variables
+├── .gitignore                 # Git ignore rules
+├── LICENSE                    # MIT License
+├── README.md                  # This file
+├── requirements.txt           # Python dependencies
+└── setup.py                   # Package setup
 ```
 
 ---
 
-## Vision Pipeline (MNIST)
+## 💡 Usage Examples
 
-### What It Does
+### Vision Experiments - Single Command for Everything! 🎯
 
-- **Loads MNIST data** from CSVs or torchvision
-- **Trains a SimpleMLP model** using different batch strategies:
-  - **Random Batching** - Standard random sampling
-  - **Fixed Batching** - Sequential batching
-  - **Smart Batching** - Prioritizes high-loss samples
-- **Logs metrics** - Training/test accuracy and loss for each epoch
-- **Saves results** automatically to organized output directories
-- **Computes statistics** - Mean ± 95% confidence intervals across multiple runs
-
-### Running Experiments
-
-#### Train All Strategies
-
+**NEW: Run Everything at Once**
 ```bash
-python -m trainer.pipelines.vision.vision
+# One command for complete pipeline:
+# - Run experiments with all strategies
+# - Generate comparison plots
+# - Benchmark across datasets
+python -m tasks.vision.run_all
+
+# Quick test mode (1 epoch, 1 run)
+python -m tasks.vision.run_all --quick
+
+# Run on specific dataset
+python -m tasks.vision.run_all --dataset cifar10_csv
+
+# Skip benchmark
+python -m tasks.vision.run_all --no-benchmark
+
+# Custom benchmark datasets
+python -m tasks.vision.run_all --benchmark-datasets mnist_csv qmnist_csv cifar10_csv
 ```
 
-This will:
-- Train SimpleMLP on MNIST for each strategy in `constants_batch_strategy.py`
-- Run `N_RUNS` independent trials (default: 5) with different random seeds
-- Compute mean ± 95% CI for accuracy/loss metrics
-- Save plots and summary to `trainer/pipelines/vision/output/batching_{strategy}/run-XXX/`
-
-Each run directory contains:
-- `summary.txt` - Mean and confidence intervals
-- `test_acc.png`, `train_acc.png` - Accuracy curves
-- `test_loss.png`, `train_loss.png` - Loss curves
-
-#### Compare Two Strategies
-
+**Individual Commands (if needed)**
 ```bash
-python trainer.pipelines.vision.comparison_vision_batch.py
+# Run experiments only
+python -m tasks.vision.run_experiment
+python -m tasks.vision.run_experiment --dataset cifar10_csv
+
+# Compare strategies
+python -m tasks.vision.compare --dataset mnist_csv
+
+# Benchmark across datasets
+python -m tasks.vision.benchmark --strategy Random --datasets mnist_csv qmnist_csv
+
+# Check device configuration
+python scripts/check_device.py
 ```
 
-- Edit `COMPARE_BATCH_STRATEGY_PAIRS` in `trainer/constants_batch_strategy.py`
-- Generates overlay plots comparing two strategies
-- Saves to `trainer/pipelines/vision/output/comparison_{stratA}_{stratB}/`
+### Customizing Experiments
 
-#### Benchmark Across Datasets
-
-```bash
-python -m trainer.pipelines.vision.benchmark_datasets
-```
-
-- Edit `DATASETS` list at top of `benchmark_datasets.py`
-- Currently supports: `mnist_csv`, `mnist`, `qmnist`, `cifar10_flat`
-- Generates per-dataset plots and summaries
-
-#### Switching Datasets
-
-You can easily switch between datasets using either the config file or command-line arguments:
-
-**Method 1: Edit Config File (Permanent)**
-
-Edit `trainer/constants.py` and change the `ACTIVE_DATASET` constant:
-
+Edit `config/vision.py`:
 ```python
-# Change this line (around line 58):
-ACTIVE_DATASET = "mnist_csv"  # Default
-
-# To one of these:
-ACTIVE_DATASET = "qmnist_csv"    # QMNIST dataset
-ACTIVE_DATASET = "cifar10_csv"   # CIFAR-10 dataset
-ACTIVE_DATASET = "cifar100_csv"  # CIFAR-100 dataset
-```
-
-Then run normally:
-```bash
-python -m trainer.pipelines.vision.vision
-```
-
-**Method 2: Command-Line Override (Quick Switching)**
-
-Override the default without editing files:
-
-```bash
-# Use MNIST (default)
-python -m trainer.pipelines.vision.vision
-
-# Use QMNIST
-python -m trainer.pipelines.vision.vision --dataset qmnist_csv
-
-# Use CIFAR-10
-python -m trainer.pipelines.vision.vision --dataset cifar10_csv
-
-# Use CIFAR-100
-python -m trainer.pipelines.vision.vision --dataset cifar100_csv
-```
-
-**Supported Datasets:**
-- `mnist_csv` - MNIST (784 features, 10 classes) ~123 MB CSV
-- `qmnist_csv` - QMNIST (784 features, 10 classes) ~314 MB CSV
-- `cifar10_csv` - CIFAR-10 (3072 features, 10 classes) ~615 MB CSV
-- `cifar100_csv` - CIFAR-100 (3072 features, 100 classes) ~615 MB CSV
-
-**Note:** CSV files are automatically downloaded and converted on first use. The conversion process takes 30 seconds (MNIST) to 3 minutes (CIFAR) and only happens once.
-
-### Output Example
-
-```
-trainer/pipelines/vision/output/
-├── batching_Random/
-│   └── run-001/
-│       ├── summary.txt
-│       ├── test_acc.png
-│       ├── train_acc.png
-│       ├── test_loss.png
-│       └── train_loss.png
-├── batching_Fixed/
-│   └── run-001/...
-├── batching_Smart/
-│   └── run-001/...
-└── comparison_Fixed_Smart/
-    ├── train_acc_cmp.png
-    ├── test_acc_cmp.png
-    ├── train_loss_cmp.png
-    └── test_loss_cmp.png
+EPOCHS = 10          # Increase epochs
+N_RUNS = 10          # More runs for better statistics
+BATCH_SIZE = 128     # Larger batches
+ACTIVE_DATASET = "cifar10_csv"  # Change default dataset
 ```
 
 ---
 
-## Dataset Management
+## ⚙️ Configuration
 
-### Config-Driven Dataset Downloader
+All configuration is centralized in the `config/` directory. Edit these files to change hyperparameters:
 
-The project includes a fully config-driven dataset downloader. Add new datasets by editing YAML only - no Python code needed!
-
-### Available Commands
-
-**List all datasets:**
-```bash
-python simple_dataset_loader.py list
-```
-
-**Download specific dataset:**
-```bash
-python simple_dataset_loader.py download cifar10
-python simple_dataset_loader.py download mnist --yes  # skip confirmation
-```
-
-**Download with auto-confirmation:**
-```bash
-python simple_dataset_loader.py download mnist --yes
-```
-
-### Available Datasets
-
-#### Vision Datasets
-- **CIFAR-10** (577 MB) - 60k 32×32 color images in 10 classes
-- **CIFAR-100** (576 MB) - 60k 32×32 color images in 100 classes
-- **MNIST** (340 MB) - 70k 28×28 grayscale handwritten digits
-- **QMNIST** (586 MB) - Extended MNIST with additional test sets
-- **SVHN** (4 GB) - Street View House Numbers dataset
-- **CINIC-10** (1.2 GB) - CIFAR-10 extended with ImageNet images
-- **Tiny ImageNet** (481 MB) - 200 classes, 500 images each
-- **VOC 2012** (3.7 GB) - Object detection and segmentation
-
-#### NLP Datasets
-- **CoLA** (5 MB) - Corpus of Linguistic Acceptability
-- **SST-2** (10 MB) - Stanford Sentiment Treebank
-- **E2E NLG** (15 MB) - End-to-End NLG Challenge dataset
-
-### Dataset Storage Location
-
-Default location: `./datasets/`
-
-**Change storage location:**
-
-1. **Symbolic link (recommended for shared storage):**
-   ```bash
-   ln -s /path/to/shared/datasets ./datasets
-   ```
-
-2. **Edit code:**
-   Modify `DATASETS_ROOT` in `simple_dataset_loader.py` line 32
-
-3. **Environment variable:**
-   Set `DATASETS_ROOT=/path/to/datasets` and modify code to read from `os.environ`
-
-**For college cloud setup:**
-```bash
-cd /home/hice1/pawate3/scratch/Training-Batch-Selection
-ln -s /storage/ice-shared/cs8903onl/lw-batch-selection/datasets ./datasets
-```
-
-### Directory Structure After Download
-
-```
-datasets/
-├── vision/
-│   ├── cifar10/
-│   ├── cifar100/
-│   ├── mnist/
-│   ├── qmnist/
-│   └── ...
-└── nlp/
-    ├── cola/
-    ├── sst2/
-    └── e2e_nlg/
-```
+- **`config/base.py`** - Device settings, paths, GPU configuration
+- **`config/vision.py`** - Vision training hyperparameters
+- **`config/nlp.py`** - NLP pretraining hyperparameters
+- **`config/datasets.py`** - Dataset specifications
+- **`config/batch_strategies.py`** - Batch strategy registry
+- **`config/models.py`** - Model configurations
 
 ---
 
-## Configuration System
+## 🎲 Batch Strategies
 
-All configuration is centralized in Python constants files. Change settings without touching core logic!
+### 1. Random Batching (Baseline)
+Standard approach: shuffle dataset at epoch start, iterate sequentially.
 
-### 1. Training Hyperparameters (`trainer/constants.py`)
+### 2. Fixed Batching
+No shuffling - always processes data in same order. Baseline to measure shuffling effect.
 
-```python
-# Model architecture
-INPUT_DIM = 784        # 28×28 flattened
-HIDDEN_DIM = 128
-NUM_CLASSES = 10
-
-# Training
-EPOCHS = 5
-BATCH_SIZE = 64
-N_RUNS = 5             # Number of independent trials
-DEVICE = 'cpu'         # or 'cuda'
-
-# Smart batch hyperparameters
-MOVING_AVG_DECAY = 0.9
-EXPLORE_FRAC = 0.5     # 50% random samples
-TOP_K_FRAC = 0.2       # Top 20% high-loss samples
-
-# Reproducibility
-RANDOM_SEED = 2024
-```
-
-### 2. Batch Strategy Registry (`trainer/constants_batch_strategy.py`)
-
-```python
-# Key: Display name for plots/dirs
-# Value: Module name (relative to trainer.batching.vision_batching)
-BATCH_STRATEGIES = {
-    "Random": "random_batch",
-    "Fixed": "fixed_batch",
-    "Smart": "smart_batch"
-}
-
-# Pairs to compare
-COMPARE_BATCH_STRATEGY_PAIRS = [
-    ("Fixed", "Smart"),
-    ("Random", "Smart"),
-]
-```
-
-### 3. Dataset Specifications (`trainer/constants_datasets.py`)
-
-```python
-DATASET_SPECS = {
-    "mnist": {
-        "builder": "build_mnist",
-        "input_dim": 28 * 28,
-        "num_classes": 10,
-        "subdir": "vision/MNIST",
-    },
-    "cifar10_flat": {
-        "builder": "build_cifar10_flat",
-        "input_dim": 3 * 32 * 32,
-        "num_classes": 10,
-        "subdir": "vision/cifar10",
-    },
-    # Add more datasets here...
-}
-```
-
-### 4. Dataset Download Configuration (`dataset_config_enhanced.yaml`)
-
-```yaml
-vision_datasets:
-  mnist:
-    download:
-      method: "torchvision"
-      class_name: "MNIST"
-      splits:
-        train:
-          param_name: "train"
-          param_value: true
-    # Add more configuration...
-```
+### 3. Smart Batching (Loss-Based)
+Prioritizes samples based on recent loss history:
+- **Exploration**: Randomly sample examples
+- **Exploitation**: Focus on high-loss (difficult) examples
+- Uses exponential moving average for per-sample loss tracking
 
 ---
 
-## Adding Custom Components
+## 📊 Datasets
 
-### Adding a New Batch Strategy
-
-**1. Create strategy module** in `trainer/batching/vision_batching/my_strategy.py`:
-
-```python
-import numpy as np
-
-def batch_sampler(dataset, batch_size, **kwargs):
-    """
-    Yield batches of indices from the dataset.
-
-    Args:
-        dataset: PyTorch Dataset object
-        batch_size: Number of samples per batch
-        **kwargs: Optional args (e.g., loss_history for smart batching)
-
-    Yields:
-        np.ndarray: Batch indices
-    """
-    n = len(dataset)
-    n_batches = n // batch_size
-
-    for _ in range(n_batches):
-        # Your custom logic here
-        batch_idxs = np.random.choice(n, batch_size, replace=False)
-        yield batch_idxs
-```
-
-**2. Register strategy** in `trainer/constants_batch_strategy.py`:
-
-```python
-BATCH_STRATEGIES = {
-    "Random": "random_batch",
-    "Fixed": "fixed_batch",
-    "Smart": "smart_batch",
-    "MyStrategy": "my_strategy",  # Add this line
-}
-```
-
-**3. Run experiments:**
-```bash
-python -m trainer.pipelines.vision.vision
-```
-
-Your strategy will automatically be evaluated alongside others!
-
-### Adding a New Dataset
-
-**Using the Dataset Factory Pattern (Recommended):**
-
-**1. Add specifications** to `trainer/constants_datasets.py`:
-
-```python
-DATASET_SPECS = {
-    "my_dataset": {
-        "builder": "build_my_dataset",
-        "input_dim": 28 * 28,
-        "num_classes": 10,
-        "subdir": "vision/my_dataset",
-    },
-}
-```
-
-**2. Add builder function** to `trainer/dataloader/builders.py`:
-
-```python
-def build_my_dataset(root, *, as_flat=True, normalize=True, download=False, **kwargs):
-    train = MyDataset(root, train=True, flatten=as_flat, normalize=normalize, download=download)
-    test = MyDataset(root, train=False, flatten=as_flat, normalize=normalize, download=download)
-    return train, test
-```
-
-**3. Create dataset class** in `trainer/dataloader/vision_dataloader.py`:
-
-```python
-from trainer.dataloader.base_dataloader import BaseDataset
-
-class MyDataset(BaseDataset):
-    def __len__(self):
-        return ...
-
-    def __getitem__(self, idx):
-        return x, y  # (tensor, label)
-```
-
-**4. Add to dataset downloader** (optional) in `dataset_config_enhanced.yaml`:
-
-```yaml
-vision_datasets:
-  my_dataset:
-    download:
-      method: "torchvision"
-      class_name: "MyDataset"
-```
-
-**5. Use it immediately:**
-
-```python
-from trainer.dataloader.factory import build_dataset, build_model_for
-from trainer.constants import SHARED_DATA_DIR
-
-train_ds, test_ds = build_dataset(SHARED_DATA_DIR, "my_dataset")
-model = build_model_for("my_dataset", train_ds, SimpleMLP)
-```
-
-### Adding a New Dataset to Downloader
-
-Edit `dataset_config_enhanced.yaml` only - no Python code needed!
-
-```yaml
-vision_datasets:
-  fashion_mnist:
-    download:
-      method: "torchvision"
-      class_name: "FashionMNIST"
-      splits:
-        train:
-          param_name: "train"
-          param_value: true
-        test:
-          param_name: "train"
-          param_value: false
-    metadata:
-      description: "Fashion-MNIST: 70k 28x28 grayscale fashion images"
-      size_mb: 340
-      num_samples: 70000
-      url: "https://github.com/zalandoresearch/fashion-mnist"
-```
-
-Then run:
-```bash
-python simple_dataset_loader.py download fashion_mnist
-```
-
----
-
-## NLP Pipeline (Pretraining)
-
-The NLP pipeline is currently under development for transformer-based language model pretraining.
-
-### Running Pretraining
-
-```bash
-python trainer/pipelines/pretraining/run_pretraining.py
-```
-
-### Configuration
-
-Edit configuration sections at the top of `run_pretraining.py`:
-
-- `MODEL_CFG` - Model architecture (depth, width, vocab size, seq length)
-- `TRAIN_CFG` - Training hyperparameters (epochs, lr, warmup, grad clip)
-- `DATA_CFG` - Tokenized data location and batch settings
-- `OUTPUT_DIR` - Where to save checkpoints and metrics
-
-### Architecture
-
-- Model: TinyLLM transformer in `trainer/model/nlp/`
-- Data: Tokenized text expected in `trainer/data/pretraining/tokenized/`
-
----
-
-## Requirements
-
-### Required Dependencies
-
-```bash
-pip install torch torchvision Pillow
-```
-
-### Optional Dependencies (for NLP)
-
-```bash
-pip install datasets transformers
-```
-
-### Full Requirements
-
-```
-torch
-torchvision
-datasets
-transformers
-matplotlib
-python-dotenv
-pyyaml
-Pillow
-```
-
-Note: scipy, numpy, and pandas are included with the above packages.
-
-Install all at once:
-```bash
-pip install -r requirements.txt
-```
-
-### CUDA Support
-
-Check CUDA availability:
-```bash
-python check_cuda.py
-```
-
-Set device in `trainer/constants.py`:
-```python
-DEVICE = 'cuda'  # or 'cpu'
-```
-
----
-
-## Key Implementation Details
-
-### Batch Strategy Interface
-
-All batch strategies must implement:
-
-```python
-def batch_sampler(dataset, batch_size, **kwargs) -> Iterator[np.ndarray]:
-    """Yield batches of sample indices."""
-```
-
-The training loop automatically:
-- Dynamically imports strategy modules
-- Detects if `loss_history` parameter is needed
-- Tracks per-sample losses with exponential moving average
-- Passes loss history to samplers that need it
-
-### Smart Batching Pattern
-
-Smart batching uses per-sample loss history:
-
-```python
-def batch_sampler(dataset, batch_size, loss_history=None, **kwargs):
-    # loss_history is a np.array of shape (len(dataset),)
-    # Updated automatically by the training loop
-    if loss_history is None:
-        loss_history = np.zeros(len(dataset))
-
-    # Use loss_history to prioritize high-loss samples
-    # ...
-```
-
-### Metrics Aggregation
-
-For each strategy:
-- Run `N_RUNS` independent trials with different random seeds
-- Collect train_acc, test_acc, train_loss, test_loss for each epoch
-- Compute mean and 95% confidence interval using scipy.stats
-- Save aggregated metrics to `summary.txt`
-
-### Random Seeds
-
-For reproducibility:
-- Training uses `RANDOM_SEED` from `constants.py` as base
-- Each run gets sequential seed: `RANDOM_SEED + run_number`
-- Seeds affect both NumPy and PyTorch RNG
-
----
-
-## Automatic CSV Conversion (MNIST, QMNIST, CIFAR-10, CIFAR-100)
-
-CSV files are **automatically generated** when needed - no manual conversion required!
-
-### Supported Datasets
-
-All four vision datasets support automatic CSV conversion:
-
-| Dataset | Features | Classes | CSV Size | Conversion Time |
-|---------|----------|---------|----------|-----------------|
+| Dataset | Features | Classes | CSV Size | Auto-Convert Time |
+|---------|----------|---------|----------|-------------------|
 | MNIST | 784 (28×28 grayscale) | 10 | ~123 MB | ~30 seconds |
 | QMNIST | 784 (28×28 grayscale) | 10 | ~314 MB | ~1 minute |
 | CIFAR-10 | 3,072 (32×32×3 RGB) | 10 | ~615 MB | ~2-3 minutes |
 | CIFAR-100 | 3,072 (32×32×3 RGB) | 100 | ~615 MB | ~2-3 minutes |
 
-### How It Works
-
-1. **Checks** if CSV files already exist in either location
-2. If **not found**: Automatically downloads and converts from torchvision format
-3. **Saves** CSVs to both required locations:
-   - `datasets/vision/{DATASET}/csv/` (for benchmark_datasets)
-   - `trainer/data/vision/` (for vision.py)
-4. **Loads** the data seamlessly
-5. **Caches** - Subsequent runs load instantly from CSV
-
-### Example Output
-
-```bash
-# First time use (no CSVs exist)
-python -m trainer.pipelines.vision.vision --dataset cifar10_csv
-
-# Output:
-# Warning: CSV not found: datasets/vision/cifar10/csv/cifar10_train.csv
-# Auto-converting CIFAR10 to CSV format...
-# Note: This will create ~615 MB of CSV files
-# Downloaded CIFAR10: 50000 train, 10000 test
-#   Converting training set (50000 samples)...
-#     Progress: 10000/50000
-#     Progress: 20000/50000
-#     ...
-#   Converting test set (10000 samples)...
-# Saved CSVs to: datasets/vision/cifar10/csv
-# Saved CSVs to: trainer/data/vision
-# CSV conversion complete!
-```
-
-### Manual Conversion (Optional)
-
-If you prefer to convert datasets manually:
-
-```bash
-# Convert specific dataset to CSV
-python -m trainer.dataloader.auto_convert_csv mnist datasets/
-python -m trainer.dataloader.auto_convert_csv qmnist datasets/
-python -m trainer.dataloader.auto_convert_csv cifar10 datasets/
-python -m trainer.dataloader.auto_convert_csv cifar100 datasets/
-
-# Or use default datasets root
-python -m trainer.dataloader.auto_convert_csv cifar10
-```
-
-### CSV Format
-
-**MNIST/QMNIST:**
-- Columns: `label, pixel0, pixel1, ..., pixel783` (785 total)
-- Values: 0-255 (normalized to [0,1] on load)
-
-**CIFAR-10/CIFAR-100:**
-- Columns: `label, pixel0, pixel1, ..., pixel3071` (3,073 total)
-- Values: 0-255 (flattened RGB, normalized to [0,1] on load)
-- Order: Row-major RGB (R0,G0,B0,R1,G1,B1,...)
-
-### Benefits
-
-- **Zero Configuration**: No manual setup required
-- **Intelligent**: Only converts when necessary
-- **Fast**: Skips conversion if CSVs exist (cached)
-- **Transparent**: Shows progress and status
-- **Universal**: Works for all vision datasets
-- **Automatic Download**: Downloads source dataset if missing
+**CSV files are automatically generated on first use** - no manual steps required!
 
 ---
 
-## Troubleshooting
+## 🚀 GPU Optimization
 
-### Command Syntax Errors
+The codebase automatically detects and optimizes for GPU:
 
-**Wrong:**
+### Auto-Detection Features
+✅ Auto-switches between CUDA and CPU
+✅ Non-blocking data transfers
+✅ Pin memory for faster CPU→GPU transfer
+✅ Multi-worker data loading (4 workers on GPU)
+✅ Reproducible CUDA seeds
+
+### Performance
+- **GPU**: ~6.5 seconds per epoch (70-95% utilization)
+- **CPU**: ~30-40 seconds per epoch
+- **Expected Speedup**: 10-50× on GPU
+
+Check GPU status:
 ```bash
-python trainer.pipelines.vision.comparison_vision_batch.py
-# Error: ModuleNotFoundError: No module named 'trainer'
-```
-
-**Correct:**
-```bash
-python -m trainer.pipelines.vision.comparison_vision_batch
-# Use -m flag and omit .py extension
-```
-
-**Rule**: When running Python modules as scripts, use `-m` flag + module path (dots) + no `.py` extension
-
-### Import Errors
-
-If you see `ImportError: No module named 'torchvision'`:
-```bash
-pip install torch torchvision Pillow
-```
-
-For NLP datasets:
-```bash
-pip install datasets transformers
-```
-
-### Dataset Download Failures
-
-- Check your internet connection
-- Try running with `--yes` to auto-confirm
-- Some datasets have mirror URLs tried automatically
-- Check if you're behind a firewall or proxy
-
-### Comparison Script Errors
-
-If comparison fails with "No completed runs found":
-- Ensure you've run `python -m trainer.pipelines.vision.vision` first
-- Check that `summary.txt` exists in run directories
-- Verify runs completed successfully (not interrupted)
-
-### MNIST Path Errors
-
-If you see "Dataset not found" for MNIST:
-- The auto-converter will download and convert automatically
-- Ensure you have ~340MB free disk space
-- If using shared storage, verify symbolic link works: `ls -la datasets/`
-
-### Permission Denied on Shared Storage
-
-```bash
-# Check permissions
-ls -la /storage/ice-shared/cs8903onl/lw-batch-selection/datasets/
-
-# Verify you can read files
-cat /storage/ice-shared/cs8903onl/lw-batch-selection/datasets/vision/cifar10/...
-```
-
-### Symbolic Link Not Working
-
-```bash
-# Remove the symbolic link
-rm datasets
-
-# Recreate it
-ln -s /path/to/shared/datasets ./datasets
-
-# Verify
-ls -la datasets/
-readlink -f datasets  # Shows actual path
+python scripts/check_device.py
 ```
 
 ---
 
-## Common Commands Reference
+## 📈 Output Management
 
-### Dataset Management
+Results are saved to: `outputs/vision/{dataset}/{strategy}/run-{number}/`
 
+Each run directory contains:
+- `summary.txt` - Mean ± 95% CI statistics
+- `test_acc.png` - Test accuracy plot with CI bands
+- `train_acc.png` - Training accuracy plot
+- `test_loss.png` - Test loss plot
+- `train_loss.png` - Training loss plot
+
+---
+
+## 🔧 Adding New Components
+
+### Add a Batch Strategy
+
+1. Create `tasks/vision/batch_strategies/my_strategy.py`
+2. Register in `config/batch_strategies.py`
+3. Run: `python -m tasks.vision.run_experiment`
+
+### Add a Dataset
+
+1. Add spec to `config/datasets.py`
+2. Add builder to `tasks/vision/datasets/builders.py`
+3. Create dataset class in `tasks/vision/datasets/loaders.py`
+4. Run: `python -m tasks.vision.run_experiment --dataset my_dataset`
+
+See [docs/CLAUDE.md](docs/CLAUDE.md) for detailed instructions.
+
+---
+
+## 📚 Documentation
+
+Additional documentation in `docs/`:
+
+- **[CLAUDE.md](docs/CLAUDE.md)** - Complete developer guide
+- **[MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)** - Migration from old structure
+- **[RESTRUCTURING_STATUS.md](docs/RESTRUCTURING_STATUS.md)** - Test results
+
+---
+
+## 🐛 Troubleshooting
+
+### ModuleNotFoundError
 ```bash
-# List all datasets with availability status
-python simple_dataset_loader.py list
-
-# Download specific datasets
-python simple_dataset_loader.py download mnist --yes
-python simple_dataset_loader.py download cifar10 --yes
-python simple_dataset_loader.py download qmnist --yes
-python simple_dataset_loader.py download cifar100 --yes
-
-# Download NLP datasets
-python simple_dataset_loader.py download cola --yes
-python simple_dataset_loader.py download sst2 --yes
-python simple_dataset_loader.py download e2e_nlg --yes
+source tbs/bin/activate
+pip install -r requirements.txt
 ```
 
-### Training & Experiments
+### CUDA out of memory
+Reduce `BATCH_SIZE` in `config/vision.py`
 
+### Dataset not found
 ```bash
-# Run all batch strategies on MNIST (default: 5 runs per strategy)
-python -m trainer.pipelines.vision.vision
-
-# Compare two strategies (edit COMPARE_BATCH_STRATEGY_PAIRS first)
-python -m trainer.pipelines.vision.comparison_vision_batch
-
-# Benchmark across multiple datasets (edit DATASETS list first)
-python -m trainer.pipelines.vision.benchmark_datasets
+python scripts/download_datasets.py download mnist --yes
 ```
 
-### Testing & Verification
+For more help, see [docs/CLAUDE.md](docs/CLAUDE.md)
 
-```bash
-# Check configuration
-python -c "from trainer.constants import DATASETS_ROOT; print(f'Dataset root: {DATASETS_ROOT}')"
+---
 
-# Test dataset loading
-python -c "from trainer.dataloader.factory import build_dataset; from trainer.constants import DATASETS_ROOT; train, test = build_dataset(DATASETS_ROOT, 'mnist'); print(f'✔️ MNIST: {len(train)} train, {len(test)} test')"
+## 📄 License
 
-# Check batch strategies
-python -c "from trainer.constants_batch_strategy import BATCH_STRATEGIES; print('Strategies:', list(BATCH_STRATEGIES.keys()))"
+MIT License - see [LICENSE](LICENSE) file
 
-# Test model building
-python -c "from trainer.dataloader.factory import build_dataset, build_model_for; from trainer.model.vision.model import SimpleMLP; from trainer.constants import DATASETS_ROOT; train, _ = build_dataset(DATASETS_ROOT, 'mnist'); model = build_model_for('mnist', train, SimpleMLP); print(f'✔️ Model: {model.__class__.__name__}')"
+---
 
-# Check MNIST CSVs exist
-ls -lh datasets/vision/MNIST/csv/ trainer/data/vision/mnist_*.csv
-```
+## 🎓 Citation
 
-### Output Management
-
-```bash
-# View latest run for a strategy
-ls -lrt trainer/pipelines/vision/output/batching_random/run-*/
-
-# View comparison plots
-ls trainer/pipelines/vision/output/comparison_*/
-
-# Check summary statistics
-cat trainer/pipelines/vision/output/batching_random/run-001/summary.txt
+```bibtex
+@software{training_batch_selection,
+  title={Training Batch Selection Research Project},
+  author={Human Augment Analytics Group},
+  organization={Georgia Institute of Technology},
+  year={2024},
+  url={https://github.com/Human-Augment-Analytics/Training-Batch-Selection}
+}
 ```
 
 ---
 
-## License
+## 🏆 Acknowledgments
 
-This project is part of the HAAG Batch Selection Research Project. Individual datasets have their own licenses - please refer to the original dataset sources for licensing information.
-
----
-
-## Project Status
-
-### Fully Implemented
-- ✅ Vision pipeline with multiple batch strategies
-- ✅ Config-driven dataset downloader (100%)
-- ✅ Dataset factory pattern for easy dataset loading
-- ✅ Multi-dataset benchmarking
-- ✅ Automated experiment tracking and plotting
-
-### Partially Config-Driven (~60%)
-- ⚠️ Trainer hyperparameters (100% config-driven)
-- ⚠️ Batch strategy registry (100% config-driven)
-- ⚠️ Batch strategy logic (requires Python functions)
-- ⚠️ Dataset builders (requires Python functions)
-
-### Under Development
-- 🚧 NLP pretraining pipeline
-- 🚧 Additional batch selection strategies
-- 🚧 More dataset integrations
+- Georgia Institute of Technology
+- Human Augment Analytics Group (HAAG)
 
 ---
 
-## Support
-
-For issues or questions:
-1. Check this README first
-2. Run `python simple_dataset_loader.py` to see available commands
-3. Check the code comments in relevant files
-4. Verify file permissions and paths
-
----
-
-## Contributors
-
-Human Augment Analytics Group (HAAG) - Georgia Tech
+**Made with ❤️ for deep learning research**
