@@ -1,0 +1,12 @@
+Benchmark: Random across datasets
+Epochs: 1, Runs: 1
+Datasets: mnist_csv, qmnist_csv
+======================================================================
+
+mnist_csv:
+Epoch 1: train_acc=0.9011±nan, test_acc=0.9406±nan, train_loss=0.3600±nan
+Time: 7.45±nan sec
+
+qmnist_csv:
+Epoch 1: train_acc=0.9012±nan, test_acc=0.9355±nan, train_loss=0.3598±nan
+Time: 6.35±nan sec

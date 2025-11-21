@@ -2,9 +2,9 @@
 
 A research project for evaluating and comparing different **batch selection strategies** during neural network training. Instead of using standard random batching, this project experiments with different ways to select which samples go into each training batch.
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.9-red.svg)](https://pytorch.org/)
-[![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![Python](https://img.shields.io/badge/Python-3.10--3.11-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.x-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 
 ---
 
@@ -44,6 +44,11 @@ A research project for evaluating and comparing different **batch selection stra
 
 ## 🚀 Quick Start
 
+### Requirements
+
+- **Python 3.10 or 3.11** (enforced by `pyproject.toml`)
+- CUDA 12.x (optional, for GPU acceleration)
+
 ### Installation
 
 ```bash
@@ -51,12 +56,21 @@ A research project for evaluating and comparing different **batch selection stra
 git clone https://github.com/Human-Augment-Analytics/Training-Batch-Selection.git
 cd Training-Batch-Selection
 
-# Create virtual environment
-python3 -m venv tbs
-source tbs/bin/activate  # On Windows: tbs\Scripts\activate
+# Specifically for GA TECH PACE
+module load python/3.10
 
-# Install dependencies
+# Create virtual environment (use Python 3.10 or 3.11)
+python3.10 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install --upgrade pip
+
+# Install dependencies (choose one):
+
+# Option A: Exact pinned versions (recommended for reproducibility)
 pip install -r requirements.txt
+
+# Option B: Flexible versions from pyproject.toml
+pip install .
 ```
 
 ### Download Datasets
@@ -136,8 +150,9 @@ Training-Batch-Selection/
 ├── .gitignore                 # Git ignore rules
 ├── LICENSE                    # MIT License
 ├── README.md                  # This file
-├── requirements.txt           # Python dependencies
-└── setup.py                   # Package setup
+├── pyproject.toml             # Project config & Python version constraint
+├── requirements.txt           # Pinned dependencies for reproducibility
+└── setup.py                   # Package setup (legacy)
 ```
 
 ---

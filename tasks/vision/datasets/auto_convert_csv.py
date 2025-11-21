@@ -49,7 +49,8 @@ def ensure_mnist_csv(root_dir, force_regenerate=False):
         loc.mkdir(parents=True, exist_ok=True)
     
     # Load MNIST from torchvision
-    mnist_dir = Path(root_dir) / "vision"
+    # Use MNIST subfolder so torchvision downloads to datasets/vision/MNIST/
+    mnist_dir = Path(root_dir) / "vision" / "MNIST"
     try:
         train_dataset = MNIST(root=str(mnist_dir), train=True, download=False)
         test_dataset = MNIST(root=str(mnist_dir), train=False, download=False)
@@ -144,7 +145,8 @@ def ensure_qmnist_csv(root_dir, force_regenerate=False):
         loc.mkdir(parents=True, exist_ok=True)
 
     # load QMNIST from torchvision
-    qmnist_dir = Path(root_dir) / "vision"
+    # Use QMNIST subfolder so torchvision downloads to datasets/vision/QMNIST/
+    qmnist_dir = Path(root_dir) / "vision" / "QMNIST"
     try:
         train_dataset = QMNIST(root=str(qmnist_dir), train=True, download=False)
         test_dataset = QMNIST(root=str(qmnist_dir), train=False, download=False)
@@ -240,7 +242,8 @@ def ensure_cifar10_csv(root_dir, force_regenerate=False):
         loc.mkdir(parents=True, exist_ok=True)
 
     # load CIFAR10 from torchvision
-    cifar_dir = Path(root_dir) / "vision"
+    # Use cifar10 subfolder so torchvision downloads to datasets/vision/cifar10/
+    cifar_dir = Path(root_dir) / "vision" / "cifar10"
     try:
         train_dataset = CIFAR10(root=str(cifar_dir), train=True, download=False)
         test_dataset = CIFAR10(root=str(cifar_dir), train=False, download=False)
@@ -339,7 +342,8 @@ def ensure_cifar100_csv(root_dir, force_regenerate=False):
         loc.mkdir(parents=True, exist_ok=True)
 
     # load CIFAR100 from torchvision
-    cifar_dir = Path(root_dir) / "vision"
+    # Use cifar100 subfolder so torchvision downloads to datasets/vision/cifar100/
+    cifar_dir = Path(root_dir) / "vision" / "cifar100"
     try:
         train_dataset = CIFAR100(root=str(cifar_dir), train=True, download=False)
         test_dataset = CIFAR100(root=str(cifar_dir), train=False, download=False)

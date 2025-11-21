@@ -1,0 +1,2 @@
+Epoch 1: train_acc=0.3291±nan, test_acc=0.3619±nan, train_loss=1.8727±nan
+Time: 21.01±nan sec
