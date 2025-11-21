@@ -29,7 +29,7 @@ except:
 
 
 # Which config to use?
-CONFIG_FILE = "dataset_config_enhanced.yaml"
+CONFIG_FILE = "config/dataset_config_enhanced.yaml"
 
 
 def load_config():

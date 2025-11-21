@@ -5,3 +5,5 @@ datasets/
 CLAUDE.md
 tbs/
 trainer/data/vision/*.csv
+legacy/trainer/data/vision/mnist_train.csv
+legacy/trainer/data/vision/mnist_train.csv
