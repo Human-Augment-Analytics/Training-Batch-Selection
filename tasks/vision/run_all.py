@@ -307,6 +307,10 @@ Examples:
 
     parser.add_argument('--dataset', type=str, default=ACTIVE_DATASET,
                        help=f'Primary dataset for experiments (default: {ACTIVE_DATASET})')
+    parser.add_argument('--datasets', type=str, nargs='+',
+                       help='Run on multiple specific datasets (e.g., --datasets mnist_csv cifar10_csv qmnist_csv)')
+    parser.add_argument('--all-datasets', action='store_true',
+                       help='Run experiments on all vision datasets sequentially')
     parser.add_argument('--no-benchmark', action='store_true',
                        help='Skip benchmark across datasets')
     parser.add_argument('--benchmark-datasets', type=str, nargs='+',
@@ -334,21 +338,53 @@ Examples:
     # Display device info
     display_device_info()
 
-    # Validate dataset
-    if args.dataset not in DATASET_SPECS:
-        print(f"\n✗ Error: Unknown dataset '{args.dataset}'")
-        print(f"Available datasets: {list(DATASET_SPECS.keys())}")
+    # Determine which datasets to run
+    if args.all_datasets:
+        # Get all vision datasets
+        vision_datasets = [name for name in DATASET_SPECS.keys() if '_csv' in name]
+        datasets_to_run = vision_datasets
+        print(f"\n🔄 Running on ALL vision datasets: {', '.join(datasets_to_run)}")
+    elif args.datasets:
+        # Run on user-specified list of datasets
+        datasets_to_run = args.datasets
+        # Validate all datasets
+        invalid = [d for d in datasets_to_run if d not in DATASET_SPECS]
+        if invalid:
+            print(f"\n✗ Error: Unknown datasets: {', '.join(invalid)}")
+            print(f"Available datasets: {list(DATASET_SPECS.keys())}")
+            return 1
+        print(f"\n🔄 Running on specified datasets: {', '.join(datasets_to_run)}")
+    else:
+        # Validate single dataset
+        if args.dataset not in DATASET_SPECS:
+            print(f"\n✗ Error: Unknown dataset '{args.dataset}'")
+            print(f"Available datasets: {list(DATASET_SPECS.keys())}")
+            return 1
+        datasets_to_run = [args.dataset]
+
+    # Track all completed experiments across datasets
+    all_completed = {}
+
+    # Step 1: Run all experiments for each dataset
+    for dataset_name in datasets_to_run:
+        print(f"\n{'='*70}")
+        print(f"PROCESSING DATASET: {dataset_name}")
+        print(f"{'='*70}")
+
+        completed = run_all_experiments(dataset_name, epochs, BATCH_SIZE, n_runs)
+
+        if not completed:
+            print(f"\n⚠️  No experiments completed successfully for {dataset_name}.")
+            continue
+
+        all_completed[dataset_name] = completed
+
+        # Step 2: Run comparisons for this dataset
+        run_all_comparisons(dataset_name, epochs)
+
+    if not all_completed:
+        print("\n✗ No experiments completed successfully on any dataset.")
         return 1
-
-    # Step 1: Run all experiments
-    completed = run_all_experiments(args.dataset, epochs, BATCH_SIZE, n_runs)
-
-    if not completed:
-        print("\n✗ No experiments completed successfully.")
-        return 1
-
-    # Step 2: Run comparisons
-    run_all_comparisons(args.dataset, epochs)
 
     # Step 3: Run benchmark (optional)
     if not args.no_benchmark:
@@ -361,13 +397,18 @@ Examples:
     display_header("PIPELINE COMPLETE")
     print(f"✓ Total time: {elapsed:.1f} seconds ({elapsed/60:.1f} minutes)")
     print(f"✓ Results saved to: {OUTPUTS_ROOT / 'vision'}")
-    print(f"\nCompleted strategies: {', '.join(completed)}")
+
+    print(f"\nCompleted datasets and strategies:")
+    for dataset, strategies in all_completed.items():
+        print(f"  {dataset}: {', '.join(strategies)}")
+
     print(f"\nOutput structure:")
-    print(f"  {OUTPUTS_ROOT / 'vision' / args.dataset}/")
-    for strategy in completed:
-        print(f"    ├── batching_{strategy.lower()}/")
-    if VISION_STRATEGY_COMPARISON_PAIRS:
-        print(f"    ├── comparison_*/")
+    for dataset in all_completed.keys():
+        print(f"  {OUTPUTS_ROOT / 'vision' / dataset}/")
+        for strategy in all_completed[dataset]:
+            print(f"    ├── batching_{strategy.lower()}/")
+        if VISION_STRATEGY_COMPARISON_PAIRS:
+            print(f"    ├── comparison_*/")
     if not args.no_benchmark:
         print(f"  {OUTPUTS_ROOT / 'vision' / 'benchmarks'}/")
 
