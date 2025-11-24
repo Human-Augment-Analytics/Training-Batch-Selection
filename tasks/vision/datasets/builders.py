@@ -1,6 +1,6 @@
 from tasks.vision.datasets.loaders import (
     MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, QMNISTCsvDataset,
-    CIFAR10Dataset, CIFAR10CsvDataset, CIFAR100CsvDataset
+    CIFAR10Dataset, CIFAR10CsvDataset, CIFAR100CsvDataset, CINIC10CsvDataset
 )
 
 # Each builder returns (train_ds, test_ds).
@@ -49,5 +49,12 @@ def build_cifar100_csv(root, **kwargs):
     import os
     train = CIFAR100CsvDataset(os.path.join(root, "cifar100_train.csv"))
     test  = CIFAR100CsvDataset(os.path.join(root, "cifar100_test.csv"))
+    return train, test
+
+def build_cinic10_csv(root, **kwargs):
+    # root should contain cinic10_train.csv and cinic10_test.csv
+    import os
+    train = CINIC10CsvDataset(os.path.join(root, "cinic10_train.csv"))
+    test  = CINIC10CsvDataset(os.path.join(root, "cinic10_test.csv"))
     return train, test
 

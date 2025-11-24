@@ -213,6 +213,36 @@ class CIFAR100CsvDataset(BaseDataset):
         return torch.tensor(self.X[idx]), torch.tensor(self.y[idx])
 
 
+class CINIC10CsvDataset(BaseDataset):
+    """Dataset loader for CINIC-10 CSV format.
+    CINIC-10 is an extension of CIFAR-10 with ImageNet data, 32x32 RGB images."""
+    def __init__(self, csv_path):
+        self.csv_path = csv_path
+        self._load_data()
+
+    def _load_data(self):
+        # Check if CSV exists
+        if not os.path.exists(self.csv_path):
+            raise FileNotFoundError(
+                f"CINIC-10 CSV not found: {self.csv_path}\n"
+                f"Please ensure CINIC-10 data is downloaded and converted to CSV format.\n"
+                f"Expected files: cinic10_train.csv and cinic10_test.csv in {Path(self.csv_path).parent}"
+            )
+
+        # Load the CSV file
+        print(f"Loading CINIC-10 CSV from {self.csv_path}...")
+        data = pd.read_csv(self.csv_path).values
+        # First column is label, rest are pixel values (3072 for RGB 32x32)
+        self.X = data[:, 1:].astype(np.float32) / 255.0  # normalize to [0,1]
+        self.y = data[:, 0].astype(np.int64)
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return torch.tensor(self.X[idx]), torch.tensor(self.y[idx])
+
+
 class CIFAR10Dataset(BaseDataset):
     def __init__(self, root:str, train:bool=True, flatten:bool=True, download:bool=False, normalize:bool=True, augment:bool=False):
         t = []

@@ -53,6 +53,13 @@ DATASET_SPECS = {
         "subdir": "vision/cifar100/csv",
         "task": "vision",
     },
+    "cinic10_csv": {
+        "builder": "build_cinic10_csv",
+        "input_dim": 3 * 32 * 32,
+        "num_classes": 10,
+        "subdir": "vision/cinic-10/csv",
+        "task": "vision",
+    },
 
     # ========== NLP Datasets ==========
     # Add NLP dataset specs here in the future
