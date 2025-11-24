@@ -76,12 +76,16 @@ pip install .
 ### Download Datasets
 
 ```bash
+# Auto-converting datasets (MNIST, QMNIST, CIFAR-10, CIFAR-100)
 # List available datasets
 python scripts/download_datasets.py list
 
 # Download specific dataset
 python scripts/download_datasets.py download mnist --yes
 python scripts/download_datasets.py download cifar10 --yes
+
+# CINIC-10 (requires separate setup - see docs/CINIC10_SETUP.md)
+python scripts/setup_cinic10.py --convert-csv
 ```
 
 ### Run Your First Experiment
@@ -241,14 +245,31 @@ Prioritizes samples based on recent loss history:
 
 ## 📊 Datasets
 
-| Dataset | Features | Classes | CSV Size | Auto-Convert Time |
-|---------|----------|---------|----------|-------------------|
-| MNIST | 784 (28×28 grayscale) | 10 | ~123 MB | ~30 seconds |
-| QMNIST | 784 (28×28 grayscale) | 10 | ~314 MB | ~1 minute |
-| CIFAR-10 | 3,072 (32×32×3 RGB) | 10 | ~615 MB | ~2-3 minutes |
-| CIFAR-100 | 3,072 (32×32×3 RGB) | 100 | ~615 MB | ~2-3 minutes |
+| Dataset | Features | Classes | Samples | CSV Size | Auto-Convert Time |
+|---------|----------|---------|---------|----------|-------------------|
+| MNIST | 784 (28×28 grayscale) | 10 | 60K | ~123 MB | ~30 seconds |
+| QMNIST | 784 (28×28 grayscale) | 10 | 120K | ~314 MB | ~1 minute |
+| CIFAR-10 | 3,072 (32×32×3 RGB) | 10 | 60K | ~615 MB | ~2-3 minutes |
+| CIFAR-100 | 3,072 (32×32×3 RGB) | 100 | 60K | ~615 MB | ~2-3 minutes |
+| **CINIC-10** | 3,072 (32×32×3 RGB) | 10 | **270K** | ~3.6 GB | ~5-10 minutes |
 
-**CSV files are automatically generated on first use** - no manual steps required!
+**MNIST/QMNIST/CIFAR**: CSV files are automatically generated on first use - no manual steps required!
+
+**CINIC-10**: Requires manual download first. See [CINIC-10 Setup Guide](docs/CINIC10_SETUP.md) for instructions.
+
+### Setting up CINIC-10
+
+CINIC-10 is an augmented extension of CIFAR-10 with 4.5× more data (270K images).
+
+```bash
+# Quick setup: Download + Convert to CSV
+python scripts/setup_cinic10.py --convert-csv
+
+# Then run experiments
+python -m tasks.vision.run_all --dataset cinic10_csv
+```
+
+For detailed instructions, see [docs/CINIC10_SETUP.md](docs/CINIC10_SETUP.md)
 
 ---
 

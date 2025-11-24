@@ -398,13 +398,173 @@ def ensure_cifar100_csv(root_dir, force_regenerate=False):
     return str(primary_loc / train_csv), str(primary_loc / test_csv)
 
 
+def ensure_cinic10_csv(root_dir, force_regenerate=False):
+    """
+    Automatically ensure CINIC-10 CSV files exist.
+
+    CINIC-10 must be manually downloaded from:
+    https://github.com/BayesWatch/cinic-10
+
+    Expected structure after download:
+    datasets/vision/cinic-10/
+    ├── train/
+    │   ├── airplane/
+    │   ├── automobile/
+    │   └── ...
+    └── test/
+        ├── airplane/
+        ├── automobile/
+        └── ...
+
+    Args:
+        root_dir: Root directory where datasets are stored
+        force_regenerate: If True, regenerate even if CSV exists
+
+    Returns:
+        tuple: (train_csv_path, test_csv_path)
+    """
+    from PIL import Image
+    import glob
+
+    # CSV location
+    csv_location = Path(root_dir) / "vision" / "cinic-10" / "csv"
+
+    train_csv = "cinic10_train.csv"
+    test_csv = "cinic10_test.csv"
+
+    # Check if CSVs already exist
+    if (csv_location / train_csv).exists() and (csv_location / test_csv).exists() and not force_regenerate:
+        print(f"CINIC-10 CSVs found at: {csv_location}")
+        return str(csv_location / train_csv), str(csv_location / test_csv)
+
+    # Check if raw CINIC-10 data exists
+    cinic_dir = Path(root_dir) / "vision" / "cinic-10"
+    train_dir = cinic_dir / "train"
+    test_dir = cinic_dir / "test"
+
+    if not train_dir.exists() or not test_dir.exists():
+        error_msg = f"""
+CINIC-10 dataset not found at {cinic_dir}
+
+Please download CINIC-10 manually:
+
+1. Download from: https://datashare.ed.ac.uk/handle/10283/3192
+   Direct link: https://datashare.ed.ac.uk/bitstream/handle/10283/3192/CINIC-10.tar.gz
+
+2. Extract to: {cinic_dir}
+
+   tar -xzf CINIC-10.tar.gz -C {root_dir}/vision/
+
+3. Expected structure:
+   {cinic_dir}/
+   ├── train/
+   │   ├── airplane/
+   │   ├── automobile/
+   │   ├── bird/
+   │   ├── cat/
+   │   ├── deer/
+   │   ├── dog/
+   │   ├── frog/
+   │   ├── horse/
+   │   ├── ship/
+   │   └── truck/
+   └── test/
+       └── (same structure)
+
+4. Then run this conversion script again.
+
+Alternative: Use the working datasets (mnist_csv, qmnist_csv, cifar10_csv, cifar100_csv)
+"""
+        raise FileNotFoundError(error_msg)
+
+    print("Converting CINIC-10 to CSV format...")
+    print("Note: CINIC-10 is large (270k images), this will take several minutes and create ~2GB CSV files")
+
+    # Ensure CSV location exists
+    csv_location.mkdir(parents=True, exist_ok=True)
+
+    # Class names (same as CIFAR-10)
+    classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+    class_to_idx = {cls: idx for idx, cls in enumerate(classes)}
+
+    # Convert training set
+    print(f"  Converting training set...")
+    train_data = []
+    for class_name in classes:
+        class_dir = train_dir / class_name
+        if not class_dir.exists():
+            print(f"    Warning: {class_dir} not found, skipping...")
+            continue
+
+        image_files = list(class_dir.glob("*.png"))
+        print(f"    Processing {class_name}: {len(image_files)} images")
+
+        for idx, img_path in enumerate(image_files):
+            if idx % 5000 == 0 and idx > 0:
+                print(f"      Progress: {idx}/{len(image_files)}")
+
+            try:
+                img = Image.open(img_path).convert('RGB')
+                pixels = np.array(img).flatten()  # 32x32x3 = 3072
+                row = [class_to_idx[class_name]] + pixels.tolist()
+                train_data.append(row)
+            except Exception as e:
+                print(f"      Error processing {img_path}: {e}")
+
+    print(f"  Total training samples: {len(train_data)}")
+    columns = ['label'] + [f'pixel{i}' for i in range(3072)]
+    train_df = pd.DataFrame(train_data, columns=columns)
+
+    # Convert test set
+    print(f"  Converting test set...")
+    test_data = []
+    for class_name in classes:
+        class_dir = test_dir / class_name
+        if not class_dir.exists():
+            print(f"    Warning: {class_dir} not found, skipping...")
+            continue
+
+        image_files = list(class_dir.glob("*.png"))
+        print(f"    Processing {class_name}: {len(image_files)} images")
+
+        for idx, img_path in enumerate(image_files):
+            if idx % 2000 == 0 and idx > 0:
+                print(f"      Progress: {idx}/{len(image_files)}")
+
+            try:
+                img = Image.open(img_path).convert('RGB')
+                pixels = np.array(img).flatten()
+                row = [class_to_idx[class_name]] + pixels.tolist()
+                test_data.append(row)
+            except Exception as e:
+                print(f"      Error processing {img_path}: {e}")
+
+    print(f"  Total test samples: {len(test_data)}")
+    test_df = pd.DataFrame(test_data, columns=columns)
+
+    # Save CSVs
+    print("Saving CSV files (this may take a few minutes due to size)...")
+    train_path = csv_location / train_csv
+    test_path = csv_location / test_csv
+
+    train_df.to_csv(train_path, index=False)
+    print(f"  Saved training CSV: {train_path}")
+
+    test_df.to_csv(test_path, index=False)
+    print(f"  Saved test CSV: {test_path}")
+
+    print("CSV conversion complete!")
+    return str(train_path), str(test_path)
+
+
 if __name__ == "__main__":
-    # can be run standalone for MNIST, QMNIST, CIFAR10, or CIFAR100
+    # can be run standalone for MNIST, QMNIST, CIFAR10, CIFAR100, or CINIC10
     import sys
 
     if len(sys.argv) < 2:
-        print("Usage: python auto_convert_csv.py [mnist|qmnist|cifar10|cifar100] [root_dir]")
+        print("Usage: python auto_convert_csv.py [mnist|qmnist|cifar10|cifar100|cinic10] [root_dir]")
         print("Example: python auto_convert_csv.py cifar10 datasets/")
+        print("\nNote: CINIC-10 must be downloaded manually first (see function docstring)")
         sys.exit(1)
 
     dataset_type = sys.argv[1].lower()
@@ -418,7 +578,9 @@ if __name__ == "__main__":
         ensure_cifar10_csv(root)
     elif dataset_type == "cifar100":
         ensure_cifar100_csv(root)
+    elif dataset_type == "cinic10":
+        ensure_cinic10_csv(root)
     else:
         print(f"Unknown dataset type: {dataset_type}")
-        print("Supported: mnist, qmnist, cifar10, cifar100")
+        print("Supported: mnist, qmnist, cifar10, cifar100, cinic10")
         sys.exit(1)

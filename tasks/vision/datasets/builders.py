@@ -53,8 +53,27 @@ def build_cifar100_csv(root, **kwargs):
 
 def build_cinic10_csv(root, **kwargs):
     # root should contain cinic10_train.csv and cinic10_test.csv
+    # Auto-convert if needed
     import os
-    train = CINIC10CsvDataset(os.path.join(root, "cinic10_train.csv"))
-    test  = CINIC10CsvDataset(os.path.join(root, "cinic10_test.csv"))
+    from pathlib import Path
+
+    train_csv = os.path.join(root, "cinic10_train.csv")
+    test_csv = os.path.join(root, "cinic10_test.csv")
+
+    # If CSVs don't exist, try to auto-convert
+    if not os.path.exists(train_csv) or not os.path.exists(test_csv):
+        print(f"CINIC-10 CSVs not found. Attempting auto-conversion...")
+        # Extract the root dir (going up from .../vision/cinic-10/csv to datasets/)
+        root_path = Path(root)
+        if root_path.name == "csv":
+            datasets_root = root_path.parent.parent.parent
+        else:
+            datasets_root = root_path.parent
+
+        from tasks.vision.datasets.auto_convert_csv import ensure_cinic10_csv
+        train_csv, test_csv = ensure_cinic10_csv(str(datasets_root))
+
+    train = CINIC10CsvDataset(train_csv)
+    test  = CINIC10CsvDataset(test_csv)
     return train, test
 
