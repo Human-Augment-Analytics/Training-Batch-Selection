@@ -23,12 +23,22 @@ from scipy import stats
 train_ds = MNISTCsvDataset(TRAIN_CSV)
 test_ds = MNISTCsvDataset(TEST_CSV)
 
+# Print device info
+print(f"Using device: {DEVICE}")
+if DEVICE == 'cuda':
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
                 loss_kwargs={}, batch_kwargs={}, seed=None):
     if seed is not None:
         np.random.seed(seed)
         torch.manual_seed(seed)
+
+    # Move model to device
+    model = model.to(DEVICE)
+
     optimizer = torch.optim.Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
 
@@ -55,6 +65,9 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
             else:
                 # Default batching (fixed/random)
                 batch_iter = batch_strategy(train_ds, batch_size)
+        elif batch_strategy.__name__ == "great_batch_sampler":
+            # GREAT batch sampler
+            batch_iter = batch_strategy(train_ds, batch_size, model=model, loss_fn=loss_fn_per_sample, device=DEVICE)
         else:
             batch_iter = batch_strategy(train_ds, batch_size)
         # Main batch loop
@@ -100,7 +113,8 @@ def evaluate(model, ds):
     loss_fn = nn.CrossEntropyLoss()
     with torch.no_grad():
         for x, y in loader:
-            x = x.view(x.size(0), -1)
+            x = x.view(x.size(0), -1).to(DEVICE)
+            y = y.to(DEVICE)
             y_pred = model(x)
             loss = loss_fn(y_pred, y)
             total_loss += loss.item() * x.size(0)

@@ -19,7 +19,7 @@ NUM_CLASSES = 10
 EPOCHS = 5
 BATCH_SIZE = 64
 N_RUNS = 5
-DEVICE = 'cpu'
+DEVICE = 'cuda' if __import__('torch').cuda.is_available() else 'cpu'
 
 # ========== Smart Batch ==========
 MOVING_AVG_DECAY = 0.9
