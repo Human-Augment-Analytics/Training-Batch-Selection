@@ -5,7 +5,9 @@ BATCH_STRATEGIES = {
     "Fixed": "fixed_batch",
     "Smart": "smart_batch",
     "MILO": "milo",
-    "CORSET": "corset",
+    "CORESET": "corset",
+    "GraND": "grand",
+    "GREAT": "great"
 }
 
 # For comparison tool:
