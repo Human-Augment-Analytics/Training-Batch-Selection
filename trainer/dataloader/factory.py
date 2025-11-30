@@ -105,6 +105,7 @@ def build_model_for(
     We do not infer; we only verify (optionally) and give loud feedback.
     """
     spec = DATASET_SPECS[name]  # must contain num_classes; plus input_dim (MLP) or in_channels (CNN)
+    print(f"[build_model_for] Constructing model: {model_cls.__name__}")
 
     # ---- Required spec fields ----
     if "num_classes" not in spec:
@@ -128,8 +129,12 @@ def build_model_for(
 
     elif is_cnn:
         cfg_c = int(spec["in_channels"])
-        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}")
-        model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
+#        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}")
+#        model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
+        input_size = spec.get("image_size", None)
+        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}, input_size={input_size}")
+        model = model_cls(in_channels=cfg_c, num_classes=cfg_nc,
+                  input_size=input_size, **model_kwargs)
 
     else:
         # Fallback: choose based on spec keys, still with no inference

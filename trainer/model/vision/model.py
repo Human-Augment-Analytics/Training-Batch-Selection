@@ -1,6 +1,8 @@
 from torch import nn
 import torch.nn.functional as F
 from trainer.constants import INPUT_DIM, HIDDEN_DIM, NUM_CLASSES
+from torchvision.models import resnet18
+
 
 class SimpleMLP(nn.Module):
     def __init__(self, input_dim=INPUT_DIM, hidden_dim=HIDDEN_DIM, num_classes=NUM_CLASSES):
@@ -38,3 +40,36 @@ class SimpleCNN(nn.Module):
         x = self.features(x)
         x = self.gap(x).squeeze(-1).squeeze(-1)  # (B,128)
         return self.classifier(x)
+
+
+class ResNet18(nn.Module):
+    def __init__(
+        self,
+        num_classes: int,
+        in_channels: int = 3,
+        input_size: int = None,
+        pretrained: bool = False,
+    ):
+        super().__init__()
+
+        self.model = resnet18(weights="IMAGENET1K_V1" if pretrained else None)
+
+        # CIFAR adjustment based on input_size
+        if input_size is not None and input_size < 64:
+            self.model.conv1 = nn.Conv2d(
+                in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False
+            )
+            self.model.maxpool = nn.Identity()
+        else:
+            # ImageNet or general case: keep default conv1/maxpool
+            if in_channels != 3:
+                self.model.conv1 = nn.Conv2d(
+                    in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
+                )
+
+        # Replace FC
+        in_features = self.model.fc.in_features
+        self.model.fc = nn.Linear(in_features, num_classes)
+
+    def forward(self, x):
+        return self.model(x)
