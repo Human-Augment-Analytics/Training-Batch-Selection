@@ -38,59 +38,6 @@ def _infer_num_classes(dataset) -> int:
     _, y0 = dataset[0]
     return int(y0.max().item() + 1 if torch.is_tensor(y0) else int(y0) + 1)
 
-def build_model_for_works(name: str, train_ds, model_cls, hidden_dim: int = 128, **model_kwargs):
-    """Construct a model consistent with the dataset spec and the model's constructor signature."""
-    spec   = DATASET_SPECS[name]
-    cfg_in = int(spec["input_dim"])     # keep flattened for consistency in specs
-    cfg_nc = int(spec["num_classes"])
-
-    # Infer from actual dataset sample
-    x0, _ = train_ds[0]
-    flat_inferred = x0.numel()
-
-    # Sanity checks
-    if cfg_in != flat_inferred:
-        raise ValueError(
-            f"[{name}] input_dim mismatch: spec={cfg_in}, inferred(flattened)={flat_inferred}. "
-            "Check flatten/resize/transforms or use the correct dataset name."
-        )
-
-    # Decide how to call the model constructor by inspecting its signature
-    params = set(inspect.signature(model_cls).parameters.keys())
-
-    if "input_dim" in params:
-        # MLP-style
-        if x0.ndim != 1:
-            # Not fatal, but warn if the dataset is images and model expects flat
-            print(f"Note: [{name}] dataset returns shape {tuple(x0.shape)}; model ctor has input_dim. "
-                  "Ensure flattening occurs in dataset or model.forward().")
-        return model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
-
-    if "in_channels" in params:
-        # CNN-style
-        if x0.ndim != 3:
-            raise ValueError(
-                f"[{name}] model ctor has in_channels (CNN), but dataset sample is {tuple(x0.shape)}. "
-                "Use the image builder (flatten=False), i.e., dataset name 'cifar10'."
-            )
-        in_channels = int(x0.shape[0])
-        return model_cls(in_channels=in_channels, num_classes=cfg_nc, **model_kwargs)
-
-    # Fallbacks if neither param name exists (some authors use different names)
-    # Try CNN-style first if input looks like images; else try MLP-style.
-    try:
-        if x0.ndim == 3:
-            in_channels = int(x0.shape[0])
-            return model_cls(in_channels=in_channels, num_classes=cfg_nc, **model_kwargs)
-        else:
-            return model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
-    except TypeError as e:
-        raise TypeError(
-            f"Unable to construct {model_cls.__name__}. Expected ctor with either "
-            "`input_dim` (for MLP) or `in_channels` (for CNN). Original error: {e}"
-        )
-
-
 def build_model_for(
     name: str,
     train_ds,
@@ -105,7 +52,8 @@ def build_model_for(
     We do not infer; we only verify (optionally) and give loud feedback.
     """
     spec = DATASET_SPECS[name]  # must contain num_classes; plus input_dim (MLP) or in_channels (CNN)
-    print(f"[build_model_for] Constructing model: {model_cls.__name__}")
+    model_name = model_cls.__name__
+    print(f"[build_model_for] Constructing model: {model_name}")
 
     # ---- Required spec fields ----
     if "num_classes" not in spec:
@@ -124,15 +72,21 @@ def build_model_for(
     # ---- Build strictly from spec ----
     if is_mlp:
         cfg_in = int(spec["input_dim"])
-        print(f"[build_model_for] {name}: MLP -> input_dim={cfg_in}, num_classes={cfg_nc}")
+        #print(f"[build_model_for] {name}: MLP -> input_dim={cfg_in}, num_classes={cfg_nc}")
+        print(
+            f"[build_model_for] {name}: {model_name} (vector model) "
+            f"-> input_dim={cfg_in}, num_classes={cfg_nc}"
+        )
         model = model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
 
     elif is_cnn:
         cfg_c = int(spec["in_channels"])
-#        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}")
-#        model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
         input_size = spec.get("image_size", None)
-        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}, input_size={input_size}")
+#        print(f"[build_model_for] {name}: CNN -> in_channels={cfg_c}, num_classes={cfg_nc}, input_size={input_size}")
+        print(
+            f"[build_model_for] {name}: {model_name} (image model) "
+            f"-> in_channels={cfg_c}, num_classes={cfg_nc}, input_size={input_size}"
+        )
         model = model_cls(in_channels=cfg_c, num_classes=cfg_nc,
                   input_size=input_size, **model_kwargs)
 
@@ -140,11 +94,19 @@ def build_model_for(
         # Fallback: choose based on spec keys, still with no inference
         if "in_channels" in spec:
             cfg_c = int(spec["in_channels"])
-            print(f"[build_model_for] {name}: CNN (fallback) -> in_channels={cfg_c}, num_classes={cfg_nc}")
+            #print(f"[build_model_for] {name}: CNN (fallback) -> in_channels={cfg_c}, num_classes={cfg_nc}")
+            print(
+                f"[build_model_for] {name}: {model_name} (fallback image model) "
+                f"-> in_channels={cfg_c}, num_classes={cfg_nc}"
+            )
             model = model_cls(in_channels=cfg_c, num_classes=cfg_nc, **model_kwargs)
         elif "input_dim" in spec:
             cfg_in = int(spec["input_dim"])
-            print(f"[build_model_for] {name}: MLP (fallback) -> input_dim={cfg_in}, num_classes={cfg_nc}")
+            #print(f"[build_model_for] {name}: MLP (fallback) -> input_dim={cfg_in}, num_classes={cfg_nc}")
+            print(
+                f"[build_model_for] {name}: {model_name} (fallback vector model) "
+                f"-> input_dim={cfg_in}, num_classes={cfg_nc}"
+            )
             model = model_cls(input_dim=cfg_in, hidden_dim=hidden_dim, num_classes=cfg_nc, **model_kwargs)
         else:
             raise TypeError(
