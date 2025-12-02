@@ -21,7 +21,7 @@ class SimpleCNN(nn.Module):
     # this model expects images, not flat vectors
     expects_flat = False
 
-    def __init__(self, in_channels=1, num_classes=10):
+    def __init__(self, in_channels=1, num_classes=10, input_size=None):
         super().__init__()
         print (f'[model.py]: building a CNN with in_channels={in_channels} and num_classes={num_classes}')
         self.in_channels=in_channels
