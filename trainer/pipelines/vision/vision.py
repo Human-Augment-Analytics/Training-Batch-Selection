@@ -1,4 +1,5 @@
 import importlib
+from trainer.batching.vision_batching.rho_loss_batch import compute_irreducible_losses, train_irreducible_loss_model
 from trainer.constants import (
     BASE_DIR, TRAIN_CSV, TEST_CSV, OUTPUT_DIR,
     EPOCHS, BATCH_SIZE, N_RUNS, RANDOM_SEED, DEVICE, MOVING_AVG_DECAY
@@ -15,7 +16,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import matplotlib.pyplot as plt
 from scipy import stats
 
@@ -29,6 +30,18 @@ if DEVICE == 'cuda':
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
 
+# ============ Helpers ============
+
+def split_train_holdout(train_ds, holdout_frac=0.1, seed=None):
+    rng = np.random.default_rng(seed)
+    indices = np.arange(len(train_ds))
+    rng.shuffle(indices)
+    n_holdout = max(1, int(len(train_ds) * holdout_frac))
+    holdout_indices = indices[:n_holdout]
+    train_indices = indices[n_holdout:]
+    return Subset(train_ds, train_indices), Subset(train_ds, holdout_indices)
+
+
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
                 loss_kwargs={}, batch_kwargs={}, seed=None):
@@ -38,6 +51,14 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
 
     # Move model to device
     model = model.to(DEVICE)
+
+    # By default train on the provided training set; RHO-Loss overrides this to a split
+    il_losses = None
+    if "rho_loss" in batch_strategy.__module__:
+        train_ds, holdout_ds = split_train_holdout(train_ds, holdout_frac=0.1, seed=seed)
+        irreducible_loss_model = model.__class__()
+        irreducible_loss_model = train_irreducible_loss_model(irreducible_loss_model, holdout_ds, device=DEVICE)
+        il_losses = compute_irreducible_losses(irreducible_loss_model, train_ds, device=DEVICE)
 
     optimizer = torch.optim.Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
@@ -52,13 +73,15 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
     for epoch in range(epochs):
         correct, n, running_loss = 0, 0, 0
         model.train()
-        # Choose batch_sampler based on required parameters
         if batch_strategy.__name__ == "batch_sampler":
             # Check what parameters the batch strategy needs
             params = batch_strategy.__code__.co_varnames
             if "loss_history" in params:
                 # Smart batching (loss-based)
                 batch_iter = batch_strategy(train_ds, batch_size, loss_history=per_sample_loss)
+            elif "irreducible_losses" in params:
+                # RHO-LOSS
+                batch_iter = batch_strategy(train_ds, batch_size, model=model, loss_fn=loss_fn_per_sample, irreducible_losses=il_losses, device=DEVICE)
             elif "model" in params and "loss_fn" in params:
                 # Gradient-based batching (GraND)
                 batch_iter = batch_strategy(train_ds, batch_size, model=model, loss_fn=loss_fn_per_sample, device=DEVICE)
@@ -70,6 +93,7 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
             batch_iter = batch_strategy(train_ds, batch_size, model=model, loss_fn=loss_fn_per_sample, device=DEVICE)
         else:
             batch_iter = batch_strategy(train_ds, batch_size)
+
         # Main batch loop
         for idxs in batch_iter:
             x, y = zip(*[train_ds[i] for i in idxs])
@@ -216,4 +240,3 @@ if __name__ == '__main__':
                         f"train_loss={means['train_loss'][i]:.4f}±{cis['train_loss'][i]:.4f}\n")
             f.write(f"CPU Time: {means['time']:.2f}±{cis['time']:.2f} sec\n")
         print(f"\n✅ All results for {strategy_label} saved to: {run_dir}")
-
