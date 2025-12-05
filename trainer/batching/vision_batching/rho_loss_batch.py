@@ -2,11 +2,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from trainer.constants import HIDDEN_DIM
 
 def train_irreducible_loss_model(model, train_ds, device='cpu', batch_size=16, epochs=5):
     """
     Phase 1 Step 1: Train the IL Model on a holdout dataset.
     """
+    model = model.__class__() # Could roll this into the rho-loss file
 
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters())
@@ -58,9 +60,9 @@ def batch_sampler(train_ds, batch_size, model=None, loss_fn=None, irreducible_lo
 
     n_samples = len(train_ds)
     n_batches = n_samples // batch_size
-    
-    # Step 1 note: 10x larger than actual batch size
-    large_batch_size = batch_size * 10
+
+    # Step 1 note: 2x larger than actual batch size
+    large_batch_size = batch_size * 2
     small_batch_size = batch_size
     
     for _ in range(n_batches):

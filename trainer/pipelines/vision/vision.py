@@ -56,8 +56,7 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
     il_losses = None
     if "rho_loss" in batch_strategy.__module__:
         train_ds, holdout_ds = split_train_holdout(train_ds, holdout_frac=0.1, seed=seed)
-        irreducible_loss_model = model.__class__()
-        irreducible_loss_model = train_irreducible_loss_model(irreducible_loss_model, holdout_ds, device=DEVICE)
+        irreducible_loss_model = train_irreducible_loss_model(model, holdout_ds, epochs=5, device=DEVICE)
         il_losses = compute_irreducible_losses(irreducible_loss_model, train_ds, device=DEVICE)
 
     optimizer = torch.optim.Adam(model.parameters())
@@ -194,9 +193,91 @@ def aggregate_results(results):
     means["time"], cis["time"] = mean_time, ci_time
     return means, cis
 
+# ============ Comparison Plots ============
+
+def create_comparison_plots(all_results, epochs):
+    """Create comparison plots for all batch strategies."""
+    comparison_dir = os.path.join(OUTPUT_DIR, 'comparison')
+    os.makedirs(comparison_dir, exist_ok=True)
+
+    # Find latest run number across all strategies
+    existing = [d for d in os.listdir(comparison_dir) if d.startswith('run-')]
+    next_num = max([int(d.split('-')[1]) for d in existing], default=0) + 1
+    comp_run_dir = os.path.join(comparison_dir, f'run-{next_num:03d}')
+    os.makedirs(comp_run_dir)
+
+    epochs_range = np.arange(1, epochs+1)
+
+    # Define metrics to plot
+    metrics_info = [
+        ('test_acc', 'Test Accuracy', 'Test Accuracy Comparison'),
+        ('train_acc', 'Train Accuracy', 'Train Accuracy Comparison'),
+        ('test_loss', 'Test Loss', 'Test Loss Comparison'),
+        ('train_loss', 'Train Loss', 'Train Loss Comparison')
+    ]
+
+    for metric, ylabel, title in metrics_info:
+        plt.figure(figsize=(10, 6))
+        for strategy_label, (means, cis) in all_results.items():
+            plt.plot(epochs_range, means[metric], label=strategy_label, linewidth=2)
+            plt.fill_between(epochs_range,
+                           means[metric] - cis[metric],
+                           means[metric] + cis[metric],
+                           alpha=0.2)
+        plt.xlabel("Epoch", fontsize=12)
+        plt.ylabel(ylabel, fontsize=12)
+        plt.title(title, fontsize=14)
+        plt.legend(fontsize=10)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(comp_run_dir, f'{metric}_comparison.png'), dpi=150)
+        plt.close()
+
+    # Create training time comparison bar chart
+    plt.figure(figsize=(10, 6))
+    strategies = list(all_results.keys())
+    times = [all_results[s][0]['time'] for s in strategies]
+    time_cis = [all_results[s][1]['time'] for s in strategies]
+
+    bars = plt.bar(range(len(strategies)), times, yerr=time_cis, capsize=5, alpha=0.7)
+    plt.xticks(range(len(strategies)), strategies, rotation=45, ha='right')
+    plt.ylabel('Training Time (seconds)', fontsize=12)
+    plt.title('Training Time Comparison', fontsize=14)
+    plt.grid(True, alpha=0.3, axis='y')
+    plt.tight_layout()
+    plt.savefig(os.path.join(comp_run_dir, 'training_time_comparison.png'), dpi=150)
+    plt.close()
+
+    # Create summary table
+    with open(os.path.join(comp_run_dir, "comparison_summary.txt"), "w") as f:
+        f.write("=" * 80 + "\n")
+        f.write("BATCH STRATEGY COMPARISON SUMMARY\n")
+        f.write("=" * 80 + "\n\n")
+
+        for strategy_label, (means, cis) in all_results.items():
+            f.write(f"\n{strategy_label}:\n")
+            f.write("-" * 40 + "\n")
+            final_train_acc = means['train_acc'][-1]
+            final_test_acc = means['test_acc'][-1]
+            final_train_loss = means['train_loss'][-1]
+            final_test_loss = means['test_loss'][-1]
+
+            f.write(f"  Final Train Accuracy: {final_train_acc:.4f} ± {cis['train_acc'][-1]:.4f}\n")
+            f.write(f"  Final Test Accuracy:  {final_test_acc:.4f} ± {cis['test_acc'][-1]:.4f}\n")
+            f.write(f"  Final Train Loss:     {final_train_loss:.4f} ± {cis['train_loss'][-1]:.4f}\n")
+            f.write(f"  Final Test Loss:      {final_test_loss:.4f} ± {cis['test_loss'][-1]:.4f}\n")
+            f.write(f"  Training Time:        {means['time']:.2f} ± {cis['time']:.2f} sec\n")
+
+        f.write("\n" + "=" * 80 + "\n")
+
+    return comp_run_dir
+
 # ============ MAIN ============
 
 if __name__ == '__main__':
+    # Dictionary to store all results for comparison
+    all_results = {}
+
     # Loop over batch strategies from config/constants
     for strategy_label, strategy_path in BATCH_STRATEGIES.items():
         print(f"\n==== Running with batching strategy: {strategy_label} ====")
@@ -213,6 +294,9 @@ if __name__ == '__main__':
             EPOCHS, BATCH_SIZE, N_RUNS
         )
         means, cis = aggregate_results(results)
+
+        # Store results for comparison
+        all_results[strategy_label] = (means, cis)
 
         # Save plots and summaries
         epochs_range = np.arange(1, EPOCHS+1)
@@ -240,3 +324,8 @@ if __name__ == '__main__':
                         f"train_loss={means['train_loss'][i]:.4f}±{cis['train_loss'][i]:.4f}\n")
             f.write(f"CPU Time: {means['time']:.2f}±{cis['time']:.2f} sec\n")
         print(f"\n✅ All results for {strategy_label} saved to: {run_dir}")
+
+    # Create comparison plots
+    print("\n==== Creating comparison plots ====")
+    comp_dir = create_comparison_plots(all_results, EPOCHS)
+    print(f"\n✅ Comparison plots saved to: {comp_dir}")

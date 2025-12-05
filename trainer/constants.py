@@ -12,7 +12,7 @@ TEST_CSV  = os.path.join(VISION_DATA_DIR, 'mnist_test.csv')
 
 # ========== Model ==========
 INPUT_DIM = 784
-HIDDEN_DIM = 128
+HIDDEN_DIM = 16
 NUM_CLASSES = 10
 
 # ========== Training ==========
