@@ -34,6 +34,6 @@ Model weights are saved to `tinyllm.pt`.
 
 ## Package layout
 - `trainer/data/loader.py`: download/split/tokenize utilities
-- `trainer/model/nlp/`: model code
+- `trainer/model/pretraining/`: model code
 - `trainer/pipelines/pretrain.py`: training loop
 - `trainer/pipelines/config.py`: config dataclasses

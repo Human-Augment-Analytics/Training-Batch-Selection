@@ -1,9 +1,6 @@
-from .model import TinyLLM
-from .layers.decoder import TransformerDecoder
+from .model import SimpleRNN, SimpleLSTM
 
 __all__ = [
-    "TinyLLM",
-    "TransformerDecoder",
+    "SimpleRNN",
+    "SimpleLSTM",
 ]
-
-
