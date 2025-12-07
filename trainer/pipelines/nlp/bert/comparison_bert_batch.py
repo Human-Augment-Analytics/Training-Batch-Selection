@@ -1,0 +1,123 @@
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from trainer.constants_nlp import NLP_OUTPUT_DIR, EPOCHS
+from trainer.constants_batch_strategy import COMPARE_NLP_BATCH_STRATEGY_PAIRS
+
+
+def load_summary(run_dir):
+    """
+    Load summary statistics from a run directory.
+
+    Args:
+        run_dir: Path to the run directory
+
+    Returns:
+        Tuple of (means, confidence_intervals) dictionaries
+    """
+    summary_file = os.path.join(run_dir, "summary.txt")
+    means, cis = {}, {}
+    lines = open(summary_file).readlines()
+
+    for metric in ["train_acc", "test_acc", "train_loss", "samples_per_epoch"]:
+        means[metric] = []
+        cis[metric] = []
+
+    for line in lines:
+        if 'Epoch' in line:
+            for metric in ["train_acc", "test_acc", "train_loss"]:
+                try:
+                    val, ci = [float(s) for s in
+                              line.split(f"{metric}=")[1].split("±")]
+                    means[metric].append(val)
+                    cis[metric].append(ci)
+                except Exception:
+                    continue
+            # Extract samples_per_epoch
+            try:
+                samples_str = line.split("samples=")[1].split()[0]
+                means["samples_per_epoch"].append(float(samples_str))
+                cis["samples_per_epoch"].append(0.0)  # No CI for samples
+            except Exception:
+                pass
+
+    return means, cis
+
+
+def find_latest_run_path(strategy_name):
+    """
+    Find the latest run directory for a strategy.
+
+    Args:
+        strategy_name: Name of the batch selection strategy
+
+    Returns:
+        Path to the latest run directory
+    """
+    strat_dir = os.path.join(NLP_OUTPUT_DIR, f"batching_{strategy_name.lower()}")
+    if not os.path.exists(strat_dir):
+        raise RuntimeError(f"No directory found for {strategy_name} at {strat_dir}")
+
+    runs = sorted([d for d in os.listdir(strat_dir) if d.startswith('run-')])
+    if not runs:
+        raise RuntimeError(f"No run-XXX directories found for {strategy_name}")
+
+    latest = runs[-1]
+    return os.path.join(strat_dir, latest)
+
+
+def plot_comparison(pair, epoch_count=EPOCHS):
+    """
+    Create comparison plots for a pair of strategies.
+
+    Args:
+        pair: Tuple of two strategy names to compare
+        epoch_count: Number of epochs
+    """
+    epochs = np.arange(1, epoch_count + 1)
+    out_dir = os.path.join(NLP_OUTPUT_DIR, f'comparison_{"_".join([p.lower() for p in pair])}')
+    os.makedirs(out_dir, exist_ok=True)
+
+    metric_labels = {
+        "test_acc": "Test Accuracy",
+        "train_acc": "Train Accuracy",
+        "train_loss": "Train Loss",
+        "samples_per_epoch": "Samples per Epoch"
+    }
+    colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
+
+    method_results = []
+    for idx, method in enumerate(pair):
+        run_dir = find_latest_run_path(method)
+        means, cis = load_summary(run_dir)
+        method_results.append((method, means, cis, colors[idx]))
+
+    for metric in ["test_acc", "train_acc", "train_loss", "samples_per_epoch"]:
+        plt.figure(figsize=(7, 5))
+        for (name, means, cis, col) in method_results:
+            if metric not in means or len(means[metric]) == 0:
+                continue
+            m = np.array(means[metric])
+            c = np.array(cis[metric])
+            plt.plot(epochs[:len(m)], m, label=name, linewidth=2, color=col)
+            if c.sum() > 0:  # Only plot CI if non-zero
+                plt.fill_between(epochs[:len(m)], m - c, m + c, alpha=0.2, color=col)
+
+        plt.xlabel('Epoch')
+        plt.ylabel(metric_labels[metric])
+        plt.title(f'{metric_labels[metric]} Comparison')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(out_dir, f"{metric}_cmp.png"))
+        plt.close()
+
+    print(f"Comparison plots for {pair[0]} vs {pair[1]} saved to {out_dir}")
+
+
+if __name__ == "__main__":
+    for pair in COMPARE_NLP_BATCH_STRATEGY_PAIRS:
+        try:
+            plot_comparison(pair)
+        except Exception as e:
+            print(f"Error comparing {pair}: {e}")
