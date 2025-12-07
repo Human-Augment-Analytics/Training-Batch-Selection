@@ -39,54 +39,55 @@ LOSS_THRESHOLD = 0.5    # Examples with loss > threshold are kept
 From the project root directory:
 
 ```bash
-# Run all strategies defined in constants_batch_strategy.py
 python -m trainer.pipelines.nlp.bert.bert
 ```
 
-Trains BERT on IMDB with all configured strategies (Random, LossBased) and saves results to `trainer/pipelines/nlp/bert/output/batching_<strategy>/run-XXX/`.
+Trains BERT on IMDB with both strategies (Normal baseline and Loss-Based) and generates:
+- 4-panel comparison plot
+- 8-panel efficiency analysis
+- Detailed metrics tables
 
-### 4. Compare Results
-
-```bash
-python -m trainer.pipelines.nlp.bert.comparison_bert_batch
-```
-
-Generates comparison plots in `output/comparison_random_lossbased/`.
+Results saved to `trainer/pipelines/nlp/bert/output/`.
 
 ## Understanding the Output
 
-### Output Structure
+### Output Files
 
 ```
 trainer/pipelines/nlp/bert/output/
-├── batching_random/
-│   └── run-001/
-│       ├── test_acc.png              # Test accuracy over epochs
-│       ├── train_acc.png             # Train accuracy over epochs
-│       ├── train_loss.png            # Training loss over epochs
-│       ├── samples_per_epoch.png     # Samples processed per epoch
-│       └── summary.txt               # Numerical results with CI
-├── batching_lossbased/
-│   └── run-001/
-│       └── (same files as above)
-└── comparison_random_lossbased/
-    ├── test_acc_cmp.png              # Side-by-side accuracy comparison
-    ├── train_acc_cmp.png
-    ├── train_loss_cmp.png
-    └── samples_per_epoch_cmp.png     # Shows compute savings!
+├── comparison_4panel.png                    # 4-panel comparison (accuracies, loss, samples)
+└── training_efficiency_analysis.png         # 8-panel efficiency breakdown
 ```
+
+The 8-panel analysis includes:
+- Total training time comparison
+- Time savings metrics
+- Speedup factor
+- Total compute usage
+- Compute savings
+- Cumulative samples over epochs
+- Per-epoch sample breakdown
+- Performance summary table
 
 ### Reading Results
 
-Each `summary.txt` contains per-epoch metrics with confidence intervals:
+Console output includes detailed comparison tables:
 ```
-Epoch 1: train_acc=0.8450±0.0120, test_acc=0.8320±0.0095, train_loss=0.3421±0.0234, samples=1000
-Epoch 2: train_acc=0.9010±0.0087, test_acc=0.8650±0.0078, train_loss=0.2156±0.0189, samples=650
-Epoch 3: train_acc=0.9234±0.0065, test_acc=0.8789±0.0072, train_loss=0.1834±0.0145, samples=420
-Training Time: 45.23±2.31 sec
-```
+METRIC                              NORMAL          LOSS-BASED      IMPROVEMENT
+----------------------------------------------------------------------
+Total Training Time (s)             45.23           32.15                  28.9%
+Total Samples Processed             3,000           2,070                  31.0%
+Final Test Accuracy                 0.8789          0.8812                +0.0023
+Speedup Factor                      1.00x           1.41x
 
-Note: Samples decrease in epochs 2-3 for loss-based strategy, indicating compute savings.
+EPOCH-BY-EPOCH BREAKDOWN
+----------------------------------------------------------------------
+EPOCH      NORMAL               LOSS-BASED           SAMPLES SAVED
+----------------------------------------------------------------------
+1          1,000                1,000                0 (0.0%)
+2          1,000                650                  350 (35.0%)
+3          1,000                420                  580 (58.0%)
+```
 
 ## File Structure
 
@@ -102,10 +103,9 @@ trainer/
 │   └── nlp_dataloader.py                     # IMDB dataset wrapper
 └── pipelines/
     └── nlp/bert/
-        ├── bert.py                           # Main training script
-        ├── comparison_bert_batch.py          # Comparison tool
-        ├── bert_trainer.py                   # Legacy standalone
-        └── BERT_Training_Colab.ipynb         # Original notebook
+        ├── bert.py                           # Main training script (matches notebook)
+        ├── BERT_Training_Notebook.ipynb      # Original tested notebook
+        └── output/                           # Generated plots and results
 ```
 
 ## Configuration Guide
@@ -136,23 +136,19 @@ N_RUNS = 5
 BATCH_SIZE = 16  # If you have enough GPU memory
 ```
 
-## Available Batch Strategies
+## Batch Strategies
 
-Edit `trainer/constants_batch_strategy.py` to control which strategies run:
+The script compares two strategies:
 
-```python
-NLP_BATCH_STRATEGIES = {
-    "Random": "random_batch",        # Baseline: all examples every epoch
-    "LossBased": "loss_based_batch"  # Smart: filter low-loss examples
-}
-```
+| Strategy | Description | Implementation |
+|----------|-------------|----------------|
+| **Normal** | Train on all examples every epoch | `trainer/batching/nlp_batching/random_batch.py` |
+| **Loss-Based** | Epoch 1: all, Epoch 2+: only high-loss examples | `trainer/batching/nlp_batching/loss_based_batch.py` |
 
-### Strategy Comparison
-
-| Strategy | Description | Compute | Accuracy |
-|----------|-------------|---------|----------|
-| **Random** | Train on all examples every epoch | 100% | Baseline |
-| **LossBased** | Epoch 1: all, Epoch 2+: only high-loss | 50-70% | Similar or better |
+Typical results:
+- Loss-based uses 50-70% of compute (samples)
+- Maintains similar or better accuracy
+- 1.3-1.5x speedup
 
 ## Adding New Batch Selection Strategies
 
@@ -207,14 +203,22 @@ COMPARE_NLP_BATCH_STRATEGY_PAIRS = [
 ]
 ```
 
-### Step 3: Run and Analyze
+### Step 3: Modify Main Script
 
-```bash
-python -m trainer.pipelines.nlp.bert.bert
-python -m trainer.pipelines.nlp.bert.comparison_bert_batch
+Edit `bert.py` to include your strategy in the comparison:
+
+```python
+# Add after Strategy 2
+model_my_strategy = BertForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=NUM_LABELS)
+results_my_strategy = train_model(
+    model_my_strategy, train_dataset, test_dataset,
+    EPOCHS, BATCH_SIZE,
+    my_strategy.batch_sampler, "MyStrategy",
+    seed=42
+)
 ```
 
-Results saved in `output/batching_mystrategy/run-001/`.
+Then add your strategy to the comparison plots.
 
 ## Example Strategy Ideas
 
