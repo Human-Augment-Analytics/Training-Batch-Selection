@@ -1,5 +1,5 @@
 from trainer.dataloader.vision_dataloader import (
-    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified
+    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified, TinyImageNetDataset
 )
 
 # Each builder returns (train_ds, test_ds).
@@ -21,6 +21,12 @@ def build_mnist_csv(root, **kwargs):
 def build_qmnist(root, *, as_flat=True, normalize=True, download=False, **kwargs):
     train = QMNISTDataset(root, train=True,  flatten=as_flat, download=download, normalize=normalize)
     test  = QMNISTDataset(root, train=False, flatten=as_flat, download=download, normalize=normalize)
+    return train, test
+
+def build_tinyimagenet(root, *, as_flat=True, normalize=True, augment=False, download=False, **kwargs):
+    import os
+    train = TinyImageNetDataset(root, train=True,  flatten=as_flat, download=download, normalize=normalize, augment=False, **kwargs)
+    test  = TinyImageNetDataset(root, train=False,  flatten=as_flat, download=download, normalize=normalize, augment=False, **kwargs)
     return train, test
 
 def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **kwargs):
