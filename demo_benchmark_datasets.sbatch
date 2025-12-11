@@ -19,7 +19,7 @@ echo "Node(s): $SLURM_NODELIST"
 echo "CUDA devices visible: ${CUDA_VISIBLE_DEVICES-<none>}"
 
 # activate Python env
-source ./venv/bin/activate
+source ./batch-selection/bin/activate
 
 # load modules if the env needs them
 #module load cuda
