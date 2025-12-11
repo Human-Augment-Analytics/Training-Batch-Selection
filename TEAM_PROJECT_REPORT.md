@@ -5,7 +5,6 @@
 **Course:** CS 8903  
 **Project Duration:** 16 Weeks (August - December 2024)  
 **Total Reports Analyzed:** 77 weekly reports across 6 team members  
-**AI Assistance:** Claude Code  
 
 ---
 
