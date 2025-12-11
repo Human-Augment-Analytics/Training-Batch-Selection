@@ -2,7 +2,9 @@
 BATCH_STRATEGIES = {
     "Random": "random_batch",
     "Fixed": "fixed_batch",
-    "Smart": "smart_batch"
+    "Smart": "smart_batch",
+    "MILO": "milo",
+    "CORSET": "corset",
 }
 
 # For comparison tool:

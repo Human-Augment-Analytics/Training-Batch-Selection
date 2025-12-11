@@ -1,4 +1,7 @@
 import importlib
+
+from tqdm import tqdm
+
 from trainer.constants import (
     BASE_DIR, TRAIN_CSV, TEST_CSV, OUTPUT_DIR,
     EPOCHS, BATCH_SIZE, N_RUNS, RANDOM_SEED, DEVICE, MOVING_AVG_DECAY
@@ -27,48 +30,47 @@ test_ds = MNISTCsvDataset(TEST_CSV)
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
                 loss_kwargs={}, batch_kwargs={}, seed=None):
+
     if seed is not None:
         np.random.seed(seed)
         torch.manual_seed(seed)
+
     optimizer = torch.optim.Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
 
-    # Prepare loss history for smart batch
     per_sample_loss = np.zeros(len(train_ds))
-    train_accs, test_accs, train_losses, test_losses = [],[],[],[]
 
-    for epoch in range(epochs):
+    train_accs, test_accs, train_losses, test_losses = [], [], [], []
+
+    # tqdm for epochs
+    epoch_bar = tqdm(range(epochs), desc="Epochs", leave=True)
+
+    for epoch in epoch_bar:
         correct, n, running_loss = 0, 0, 0
         model.train()
-        # Choose batch_sampler for 'smart', else None
+
+        # Choose batch sampler
         if batch_strategy.__name__ == "batch_sampler" and "loss_history" in batch_strategy.__code__.co_varnames:
             batch_iter = batch_strategy(train_ds, batch_size, loss_history=per_sample_loss)
         else:
             batch_iter = batch_strategy(train_ds, batch_size)
-        # Main batch loop
-        for idxs in batch_iter:
 
+        # Create tqdm for batches
+        num_batches = len(train_ds) // batch_size
+        batch_bar = tqdm(batch_iter, total=num_batches, desc=f"Epoch {epoch+1}", leave=False)
+
+        for idxs in batch_bar:
+            # Load batch
             xs, ys = zip(*[train_ds[i] for i in idxs])
-            # Keep images as images; DO NOT .view(..., -1) here
-            x = torch.stack(xs).to(DEVICE)                 # (B,C,H,W) or (B,F) depending on dataset; don't flatten here
-            x = shape_batch_for_model(model, x)            # MLP -> flattens; CNN -> keeps/reshapes
-            # labels
-            # ys are already tensors in your dataset; stack is safer than torch.tensor(list_of_tensors)
-            y = torch.stack(ys).to(DEVICE, non_blocking=True)
-            
+            x = torch.stack(xs).to(DEVICE)
+            x = shape_batch_for_model(model, x)
+            y = torch.stack(ys).to(DEVICE)
 
-            # x, y = zip(*[train_ds[i] for i in idxs])
-            # x = torch.stack(x).view(len(idxs), -1).to(DEVICE)
-            # x = shape_batch_for_model(model,x)
-            # x = x.to(DEVICE)
-            # y = torch.tensor(y).to(DEVICE)
             optimizer.zero_grad()
             y_pred = model(x)
+
             losses = loss_fn(y_pred, y)
-            if len(losses.shape)>0: # smart batch: reduction=none
-                loss = losses.mean()
-            else:
-                loss = losses
+            loss = losses.mean() if len(losses.shape) > 0 else losses
             loss.backward()
             optimizer.step()
 
@@ -76,20 +78,35 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
             correct += (y_pred.argmax(1) == y).sum().item()
             n += x.size(0)
 
-            # Update per-sample loss for smart batching
+            # Smart batch updating
             if "loss_history" in batch_strategy.__code__.co_varnames:
                 for k, idx in enumerate(idxs):
-                    per_sample_loss[idx] = MOVING_AVG_DECAY * per_sample_loss[idx] + (1 - MOVING_AVG_DECAY) * \
-                                          (losses[k].item() if len(losses.shape) > 0 else losses.item())
+                    per_sample_loss[idx] = (
+                        MOVING_AVG_DECAY * per_sample_loss[idx]
+                        + (1 - MOVING_AVG_DECAY) * (losses[k].item() if len(losses.shape) > 0 else losses.item())
+                    )
 
-        train_accs.append(correct / n)
-        train_losses.append(running_loss / n)
+            # Update batch bar postfix
+            batch_bar.set_postfix({"batch_loss": loss.item()})
+
+        # End epoch
+        train_acc = correct / n
+        train_loss = running_loss / n
         test_acc, test_loss = evaluate(model, test_ds)
+
+        train_accs.append(train_acc)
+        train_losses.append(train_loss)
         test_accs.append(test_acc)
         test_losses.append(test_loss)
-        print(f"Epoch {epoch+1}: train_acc={train_accs[-1]:.4f}, test_acc={test_acc:.4f}")
+
+        # Update epoch bar postfix
+        epoch_bar.set_postfix({
+            "train_acc": f"{train_acc:.4f}",
+            "test_acc": f"{test_acc:.4f}"
+        })
 
     return train_accs, test_accs, train_losses, test_losses
+
 
 # ============ Evaluation Function ============
 
@@ -127,19 +144,23 @@ def create_run_dir(strategy_name):
 def run_experiment(batch_strategy, strategy_label, train_ds, test_ds, model_constructor, epochs, batch_size, n_runs):
     assert callable(model_constructor) and not isinstance(model_constructor, nn.Module), "model_constructor must be a zero-arg factory (callable), not a constructed nn.Module."
     results = []
-    for seed in range(n_runs):
-        print(f"\n[{strategy_label}] Run {seed+1}/{n_runs}")
+
+    for seed in tqdm(range(n_runs), desc=f"Runs ({strategy_label})", leave=True):
         model = model_constructor()
         start = time.time()
         train_acc, test_acc, train_loss, test_loss = train_model(
             model, train_ds, test_ds, epochs, batch_size, batch_strategy, seed=seed
         )
         elapsed = time.time() - start
+
         results.append({
-            "train_acc": train_acc, "test_acc": test_acc,
-            "train_loss": train_loss, "test_loss": test_loss,
+            "train_acc": train_acc,
+            "test_acc": test_acc,
+            "train_loss": train_loss,
+            "test_loss": test_loss,
             "time": elapsed
         })
+
     return results
 
 # ============ CI calculation ============

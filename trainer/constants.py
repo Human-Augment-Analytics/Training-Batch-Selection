@@ -18,7 +18,7 @@ NUM_CLASSES = 10
 # ========== Training ==========
 EPOCHS = 5
 BATCH_SIZE = 64
-N_RUNS = 5
+N_RUNS = 1
 DEVICE = 'cpu'
 
 # ========== Smart Batch ==========
