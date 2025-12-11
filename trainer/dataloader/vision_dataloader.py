@@ -70,52 +70,6 @@ class QMNISTDataset(BaseDataset):
             x = torch.flatten(x)
         return x, torch.tensor(y, dtype=torch.int64)
 
-class TinyImageNetDataset(BaseDataset):
-
-    def __init__(
-        self,
-        root: str,
-        train: bool = True,
-        flatten: bool = True,
-        download: bool = False, 
-        normalize: bool = True,
-        augment: bool = False,
-    ):
-        t = []
-        if augment and train:
-            t += [
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomCrop(64, padding=8),
-            ]
-
-        # Tiny ImageNet 64×64 RGB
-        t.append(transforms.Resize((64, 64)))
-        t.append(transforms.ToTensor())
-
-        if normalize:
-            # Standard ImageNet statistics
-            mean = [0.485, 0.456, 0.406]
-            std  = [0.229, 0.224, 0.225]
-            t.append(transforms.Normalize(mean=mean, std=std))
-
-        tfm = transforms.Compose(t)
-
-        self.base = datasets.TINYIMAGENET(root=root, train=train, download=download, transform=tfm)
-        self.flatten = flatten
-
-        self.num_classes = len(self.base.classes)   # should be 200
-        self.in_channels = 3
-        self.class_names = list(self.base.classes)
-
-    def __len__(self) -> int:
-        return len(self.base)
-
-    def __getitem__(self, idx):
-        x, y = self.base[idx]      # x: (3, 64, 64)
-        if self.flatten:
-            x = torch.flatten(x)   # (3*64*64)
-        return x, torch.tensor(y, dtype=torch.int64)
-    
 class CIFARDatasetUnified(BaseDataset):
     """
     Unified CIFAR dataset.

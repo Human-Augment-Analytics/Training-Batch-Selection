@@ -29,7 +29,7 @@ print(f"[config] Using DEVICE = {DEVICE}, NAME = {DEVICE_NAME}")
 
 #specify the list of datasets to benchmark.  All dataset keys must exist in DATASET_SPECS
 #DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # for MLP
-DATASETS = ["cifar10", "cifar100", "tiny_imagenet"]
+DATASETS = ["cifar10", "cifar100"]
 #DATASETS = ["cifar10"]
 #MODEL_CLS =  SimpleMLP
 #MODEL_CLS =  SimpleCNN

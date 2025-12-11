@@ -55,13 +55,7 @@ DATASET_SPECS = {
         "image_size": 224,
         "subdir": "vision/ImageNet",
     },
-    "tinyimagenet": {
-        "builder": "build_tinyimagenet",
-        "input_dim": 3 * 64 * 64,   # 12288
-        "num_classes": 200,
-        "in_channels": 3,
-        "subdir": "vision/tiny-imagenet-200",
-    }
+
     # add more …
 }
 
