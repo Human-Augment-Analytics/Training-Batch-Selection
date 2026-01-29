@@ -1,0 +1,107 @@
+  Research Project: Training Batch Selection                                                                                                                          
+                                                                                                                                                                      
+  Literature Summary                                                                                                                                                  
+                                                                                                                                                                      
+  GREATS (NeurIPS 2024) - https://openreview.net/forum?id=232VcN8tSx | https://github.com/Jiachen-T-Wang/GREATS                                                       
+  - Uses Taylor expansion to approximate marginal utility of data points                                                                                              
+  - Key innovation: avoids full gradient computation by using first-order approximations                                                                              
+  - Compares against: Regular sampling, GradNorm, MaxLoss, RHO-Loss, SBERT                                                                                            
+  - Limitation: Still requires 2 forward-backward passes for ghost inner product computation                                                                          
+                                                                                                                                                                      
+  "No Train No Gain" (ArXiv 2307.06440) - https://arxiv.org/abs/2307.06440                                                                                            
+  - Benchmarked selective backprop, RHO-loss, and other efficient training methods                                                                                    
+  - Critical finding: Efficiency gains vanish when computational overhead is properly accounted for                                                                   
+  - Introduced standardized "reference system time" evaluation framework                                                                                              
+  - Conclusion: Most batch selection methods fail cost-benefit analysis                                                                                               
+                                                                                                                                                                      
+  Your Existing Codebase                                                                                                                                              
+                                                                                                                                                                      
+  Your repo has solid infrastructure:                                                                                                                                 
+  - Vision pipeline: Random, Fixed, Smart (explore-exploit) batching on MNIST                                                                                         
+  - NLP pipeline: Loss-based batch selection for BERT/IMDB (40-70% compute reduction claimed)                                                                         
+  - Modular design: Easy to add new strategies via constants_batch_strategy.py                                                                                        
+  - Statistical rigor: 95% confidence intervals across N runs                                                                                                         
+                                                                                                                                                                      
+  ---                                                                                                                                                                 
+  Research Direction Analysis                                                                                                                                         
+                                                                                                                                                                      
+  Option 1: Lightweight Batch Selection Method                                                                                                                        
+                                                                                                                                                                      
+  Problem: Existing methods (GREATS, RHO-Loss, GradNorm) add overhead that negates efficiency gains.                                                                  
+                                                                                                                                                                      
+  Potential Approaches:                                                                                                                                               
+  ┌─────────────────────────────────────────┬──────────┬─────────┬────────┐                                                                                           
+  │                Approach                 │ Overhead │ Novelty │  Risk  │                                                                                           
+  ├─────────────────────────────────────────┼──────────┼─────────┼────────┤                                                                                           
+  │ Loss-history caching (your Smart Batch) │ Very Low │ Medium  │ Low    │                                                                                           
+  ├─────────────────────────────────────────┼──────────┼─────────┼────────┤                                                                                           
+  │ Last-layer gradient proxy               │ Low      │ Medium  │ Medium │                                                                                           
+  ├─────────────────────────────────────────┼──────────┼─────────┼────────┤                                                                                           
+  │ Embedding-based clustering              │ Medium   │ High    │ Medium │                                                                                           
+  ├─────────────────────────────────────────┼──────────┼─────────┼────────┤                                                                                           
+  │ Prediction confidence                   │ Very Low │ Medium  │ Low    │                                                                                           
+  └─────────────────────────────────────────┴──────────┴─────────┴────────┘                                                                                           
+  Key Research Question: Can we achieve meaningful speedup (>20%) with <5% overhead?                                                                                  
+                                                                                                                                                                      
+  Option 2: Batch Selection for Reinforcement Learning                                                                                                                
+                                                                                                                                                                      
+  Problem: RL training is notoriously sample-inefficient; batch selection is underexplored in this domain.                                                            
+                                                                                                                                                                      
+  Potential Approaches:                                                                                                                                               
+  ┌───────────────────────────────────────────┬────────────────┬─────────┬────────┐                                                                                   
+  │                 Approach                  │  Application   │ Novelty │  Risk  │                                                                                   
+  ├───────────────────────────────────────────┼────────────────┼─────────┼────────┤                                                                                   
+  │ TD-error based prioritization             │ Extends PER    │ Medium  │ Low    │                                                                                   
+  ├───────────────────────────────────────────┼────────────────┼─────────┼────────┤                                                                                   
+  │ Variance-based curriculum (VCRL-inspired) │ RLHF/PPO       │ High    │ Medium │                                                                                   
+  ├───────────────────────────────────────────┼────────────────┼─────────┼────────┤                                                                                   
+  │ Trajectory informativeness scoring        │ Sparse rewards │ High    │ High   │                                                                                   
+  ├───────────────────────────────────────────┼────────────────┼─────────┼────────┤                                                                                   
+  │ Policy gradient variance reduction        │ All RL         │ High    │ Medium │                                                                                   
+  └───────────────────────────────────────────┴────────────────┴─────────┴────────┘                                                                                   
+  Key Research Question: Can batch selection provide meaningful improvements in RL where data efficiency matters most?                                                
+                                                                                                                                                                      
+  ---                                                                                                                                                                 
+  Recommended Research Plan                                                                                                                                           
+                                                                                                                                                                      
+  Given the landscape, I recommend a hybrid approach that combines both directions:                                                                                   
+                                                                                                                                                                      
+  Phase 1: Foundation & Validation (2-3 weeks)                                                                                                                        
+                                                                                                                                                                      
+  1. Reproduce baselines - Implement key methods (RHO-Loss, Selective Backprop) in your framework                                                                     
+  2. Establish fair benchmarking - Use wall-clock time (not just epochs) following "No Train No Gain"                                                                 
+  3. Validate your loss-based method - Rigorously test if 40-70% savings hold with overhead included                                                                  
+                                                                                                                                                                      
+  Phase 2: Novel Lightweight Method (3-4 weeks)                                                                                                                       
+                                                                                                                                                                      
+  4. Develop cheap informativeness proxy - Candidates:                                                                                                                
+    - Prediction entropy (1 forward pass)                                                                                                                             
+    - Loss delta from moving average (0 extra passes)                                                                                                                 
+    - Embedding distance from cluster centers (1 forward pass)                                                                                                        
+  5. Theoretical justification - Connect to importance sampling, curriculum learning theory                                                                           
+  6. Extensive benchmarking - Vision (CIFAR-10/100, ImageNet subset), NLP (BERT, GPT-2 pretraining)                                                                   
+                                                                                                                                                                      
+  Phase 3: RL Application (3-4 weeks)                                                                                                                                 
+                                                                                                                                                                      
+  7. Extend to RL domain - Apply lightweight method to:                                                                                                               
+    - PPO training batches                                                                                                                                            
+    - Replay buffer prioritization                                                                                                                                    
+    - RLHF preference data selection                                                                                                                                  
+  8. Novel contribution - Batch selection for policy gradient methods (underexplored)                                                                                 
+                                                                                                                                                                      
+  Phase 4: Paper Writing (2-3 weeks)                                                                                                                                  
+                                                                                                                                                                      
+  9. Ablation studies - Sensitivity to hyperparameters, dataset size, model architecture                                                                              
+  10. Write paper - Target: ICML, NeurIPS, or ICLR                                                                                                                    
+                                                                                                                                                                      
+  ---                                                                                                                                                                 
+  Concrete Next Steps                                                                                                                                                 
+                                                                                                                                                                      
+  Shall I proceed with:                                                                                                                                               
+                                                                                                                                                                      
+  1. Deep-dive technical planning - Create detailed implementation plan for Phase 1-2                                                                                 
+  2. Codebase refactoring - Prepare your repo for rigorous benchmarking with wall-clock time                                                                          
+  3. Literature survey expansion - Find more recent 2024-2025 papers on lightweight batch selection                                                                   
+  4. Prototype a specific method - Implement one promising lightweight approach                                                                                       
+                                                                                                                                                                      
+  Which direction would you like to prioritize?                                                                                                                       

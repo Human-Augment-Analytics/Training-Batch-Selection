@@ -1,0 +1,15 @@
+# Core dependencies
+torch>=2.0.0
+transformers>=4.30.0
+datasets>=2.14.0
+
+# Utilities
+tqdm>=4.65.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+
+# Optional: for faster tokenization
+tokenizers>=0.13.0
+
+# Optional: for experiment tracking
+# wandb>=0.15.0
