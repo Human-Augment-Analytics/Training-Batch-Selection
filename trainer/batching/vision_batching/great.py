@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-CANDIDATE_POOL_DEFAULT = 5000
+CANDIDATE_POOL_DEFAULT = 500  # Reduced from 5000 for faster computation
 
 
 def compute_gradient_vectors(model, dataset, indices, loss_fn, device='cpu'):
