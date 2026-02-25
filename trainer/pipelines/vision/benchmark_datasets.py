@@ -14,7 +14,7 @@ from trainer.constants_datasets import DATASET_SPECS
 from trainer.constants import SHARED_DATA_DIR
 
 # -------- config to tweak --------
-EPOCHS = 20
+EPOCHS = 5
 BATCH_SIZE = 64
 N_RUNS = 2
 
@@ -29,8 +29,10 @@ print(f"[config] Using DEVICE = {DEVICE}, NAME = {DEVICE_NAME}")
 
 #specify the list of datasets to benchmark.  All dataset keys must exist in DATASET_SPECS
 #DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # for MLP
-DATASETS = ["cifar10", "cifar100"]
-#DATASETS = ["cifar10"]
+#DATASETS = ["cifar10", "cifar100"]
+
+DATASETS = ["newt:fgvcx_plant_pathology_healthy_vs_sick","newt:nabirds_species_classification_coohaw_shshaw"]
+
 #MODEL_CLS =  SimpleMLP
 #MODEL_CLS =  SimpleCNN
 MODEL_CLS = ResNet18
@@ -45,6 +47,11 @@ def dataset_root(ds_name: str) -> str:
 def get_random_strategy():
     """Hard-code Random batching strategy."""
     mod = importlib.import_module("trainer.batching.vision_batching.random_batch")
+    return mod.batch_sampler  # must yield batches of indices
+
+def get_smart_strategy():
+    """Hard-code Smart batching strategy."""
+    mod = importlib.import_module("trainer.batching.vision_batching.smart_batch")
     return mod.batch_sampler  # must yield batches of indices
 
 def save_summary(name, means, cis, file):
@@ -249,6 +256,8 @@ def plot_combined(all_means, run_dir, epochs_range, model_cls_name):
 def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS, model_cls=SimpleMLP):
     strategy_label="Random-Benchmark"
     random_strategy = get_random_strategy()
+#    strategy_label="Smart-Benchmark"
+#    random_strategy = get_smart_strategy()
 
     def plot_metric(metric, ylabel, title, filename):
         plt.figure(figsize=(7, 5))
@@ -268,12 +277,41 @@ def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_r
 
     all_means = {}
     
-    for ds_name in datasets:
-        print(f"\n=== DATASET: {ds_name} ===")
+    for ds_key in datasets:
+        print(f"\n=== DATASET: {ds_key} ===")
+        base_name, overrides = parse_dataset_key(ds_key)
+        train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=base_name, **overrides)
+
+
+        ### is the dataset right?
+        from collections import Counter
+
+        def quick_stats(ds, name, n=2000):
+            n = min(n, len(ds))
+            ys = []
+            for i in range(n):
+                _, y = ds[i]
+                ys.append(int(y))
+            c = Counter(ys)
+            print(f"{name}: size={len(ds)} sampled={n} label_counts={dict(c)} pos_rate={c.get(1,0)/max(1,sum(c.values())):.3f}")
+
+        quick_stats(train_ds, "train")
+        quick_stats(test_ds,  "test")
+        print("train class_names:", getattr(train_ds, "class_names", None))
+        print("test  class_names:", getattr(test_ds,  "class_names", None))
+
+        x0, y0 = train_ds[0]
+        print("x0:", x0.shape, x0.dtype, "y0:", y0, y0.dtype)
+        ######
+        
+        # Use ds_key for logging (so you can see the task), but base_name for spec lookup
+        model_ctor = lambda: build_model_for(base_name, train_ds, model_cls=model_cls)
+#    for ds_name in datasets:
+#        print(f"\n=== DATASET: {ds_name} ===")
 
         # Build datasets and model 
-        train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=ds_name)
-        model_ctor = lambda: build_model_for(ds_name, train_ds, model_cls=model_cls)
+#        train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=ds_name)
+#        model_ctor = lambda: build_model_for(ds_name, train_ds, model_cls=model_cls)
         means, cis = None, None
 
         results = run_experiment(
@@ -281,22 +319,22 @@ def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_r
             EPOCHS, BATCH_SIZE, N_RUNS
         )
         means, cis = aggregate_results(results)
-        all_means[ds_name] = means
+        all_means[ds_key] = means
 
         # Copied from vision.py.  Ideally both scripts should call the same plotting/summary functions.
         # Save plots and summaries
         epochs_range = np.arange(1, EPOCHS+1)
-        plot_metric('test_acc', 'Test Accuracy', "Test Accuracy vs Epoch", f"test_acc-{ds_name}.png")
-        plot_metric('train_acc', 'Train Accuracy', "Train Accuracy vs Epoch", f"train_acc-{ds_name}.png")
-        plot_metric('train_loss', 'Train Loss', "Train Loss vs Epoch", f"train_loss-{ds_name}.png")
-        plot_metric('test_loss', 'Test Loss', "Test Loss vs Epoch", f"test_loss-{ds_name}.png")
+        plot_metric('test_acc', 'Test Accuracy', "Test Accuracy vs Epoch", f"test_acc-{ds_key}.png")
+        plot_metric('train_acc', 'Train Accuracy', "Train Accuracy vs Epoch", f"train_acc-{ds_key}.png")
+        plot_metric('train_loss', 'Train Loss', "Train Loss vs Epoch", f"train_loss-{ds_key}.png")
+        plot_metric('test_loss', 'Test Loss', "Test Loss vs Epoch", f"test_loss-{ds_key}.png")
 
         epochs_range = np.arange(1, EPOCHS + 1)
         print(f"\nCombined plots saved to: {run_dir}")
 
         # Save summary
         with open(os.path.join(run_dir, "summary.txt"), "a", buffering=1) as f:
-            f.write(f'{ds_name}\n')
+            f.write(f'{ds_key}\n')
             for i in range(EPOCHS):
                 f.write(f"Epoch {i+1}: train_acc={means['train_acc'][i]:.4f}±{cis['train_acc'][i]:.4f}, "
                         f"test_acc={means['test_acc'][i]:.4f}±{cis['test_acc'][i]:.4f}, "
@@ -306,7 +344,20 @@ def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_r
 
     plot_combined(all_means, run_dir, epochs_range, model_cls.__name__)
 
-        
+def parse_dataset_key(key: str):
+    """
+    Allows dataset keys like:
+      - "cifar10"
+      - "newt:ml_photo_rating_12_vs_45_v2"
+      - "newt:nabirds_species_classification_coohaw_shshaw"
+    Returns: (base_name, overrides_dict)
+    """
+    if key.startswith("newt:"):
+        task = key.split("newt:", 1)[1].strip()
+        if not task:
+            raise ValueError("NeWT key must look like 'newt:<task>'")
+        return "newt", {"task": task}
+    return key, {}
 
 if __name__ == "__main__":
 #    run_benchmark(DATASETS, model_cls=SimpleMLP)

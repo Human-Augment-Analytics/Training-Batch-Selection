@@ -1,5 +1,5 @@
 from trainer.dataloader.vision_dataloader import (
-    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified
+    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified, NeWTDatasetUnified
 )
 
 # Each builder returns (train_ds, test_ds).
@@ -39,6 +39,10 @@ def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **
 
 def build_cifar10(root, *, normalize=True, augment=True, download=False, in_channels=3, **kwargs):
 
+    kwargs.pop("image_size", None) # we don't know what to do with this if we get it
+    kwargs.pop("img_size", None) # might happen
+    kwargs.pop("task", None) # we don't know what to do with this if we get it
+    
     if kwargs.get("flatten", None) is True:
         raise ValueError("build_cifar10 received flatten=True; remove that override.")
     print (f'building a dataset with in_channels={in_channels}')
@@ -66,5 +70,61 @@ def build_cifar100(root, *, normalize=True, augment=True, download=False, in_cha
     test  = CIFARDatasetUnified(root, dataset='cifar100', train=False, flatten=False,
                            download=download, normalize=normalize, augment=False,
                            in_channels=in_channels, mean=CIFAR100_MEAN, std=CIFAR100_STD, **kwargs)
+    return train, test
+
+def build_newt(
+    root,
+    *,
+    task: str,
+    normalize=True,
+    augment=True,
+    in_channels=3,
+    image_size=224,
+    mean=None,
+    std=None,
+    **kwargs
+):
+    """                                                                                                           
+    Build NeWT (binary) datasets for ONE task.                                                                    
+    Expects:                                                                                                      
+      root/                                                                                                       
+        newt2021_labels.csv                                                                                       
+        newt2021_images/<id>.jpg                                                                                  
+    """
+
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_newt received flatten=True; remove that override.")
+
+    if mean is None:
+        mean = [0.485, 0.456, 0.406] if in_channels == 3 else [0.5]
+    if std is None:
+        std = [0.229, 0.224, 0.225] if in_channels == 3 else [0.5]
+
+    train = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="train",
+        flatten=False,
+        normalize=normalize,
+        augment=augment,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
+    test = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="test",
+        flatten=False,
+        normalize=normalize,
+        augment=False,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
     return train, test
 

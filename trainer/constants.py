@@ -2,7 +2,8 @@ import os
 
 # ========== Directory Paths ==========
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VISION_DATA_DIR = os.path.join(BASE_DIR, 'trainer/data/vision')
+#VISION_DATA_DIR = os.path.join(BASE_DIR, 'trainer/data/vision')
+VISION_DATA_DIR = '/storage/ice-shared/cs8903onl/lw-batch-selection/datasets/vision/MNIST/csv'
 OUTPUT_DIR = os.path.join(BASE_DIR, 'trainer/pipelines/vision/output')
 SHARED_DATA_DIR = '/storage/ice-shared/cs8903onl/lw-batch-selection/datasets'
 

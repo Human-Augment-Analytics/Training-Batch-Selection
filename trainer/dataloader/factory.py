@@ -10,16 +10,25 @@ def dataset_root(shared_root: str, name: str) -> str:
     return os.path.join(shared_root.rstrip("/"), spec["subdir"])
 
 def build_dataset(shared_root: str, name: str, **overrides):
-    """
-    shared_root: e.g. "/storage/ice-shared/cs8903onl/lw-batch-selection/datasets"
-    name: key from DATASET_SPECS
-    overrides: optional kwargs forwarded to the builder (e.g., as_flat=False for CNN)
+    """                                                                                                           
+    shared_root: e.g. "/storage/ice-shared/.../datasets"                                                          
+    name: key from DATASET_SPECS                                                                                  
+    overrides: forwarded to builder (takes precedence over spec)                                                  
     """
     spec = DATASET_SPECS[name]
     mod = importlib.import_module("trainer.dataloader.builders")
     builder = getattr(mod, spec["builder"])
     root = dataset_root(shared_root, name)
-    return builder(root, **overrides)
+
+    # Pass spec defaults to builder (e.g. task/image_size), but strip non-builder keys                            
+    builder_kwargs = dict(spec)
+    for k in ("builder", "subdir", "input_dim", "num_classes"):
+        builder_kwargs.pop(k, None)
+
+    # CLI/runtime overrides win                                                                                   
+    builder_kwargs.update(overrides)
+
+    return builder(root, **builder_kwargs)
 
 def spec_for(name: str):
     return DATASET_SPECS[name]
