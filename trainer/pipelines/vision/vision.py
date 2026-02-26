@@ -27,6 +27,12 @@ from scipy import stats
 train_ds = MNISTCsvDataset(TRAIN_CSV)
 test_ds = MNISTCsvDataset(TEST_CSV)
 
+# Print device info
+print(f"Using device: {DEVICE}")
+if DEVICE == 'cuda':
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+
 # ============ Train Function (Batch strategy as argument) =============
 def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
                 loss_kwargs={}, batch_kwargs={}, seed=None):
@@ -35,9 +41,16 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
         np.random.seed(seed)
         torch.manual_seed(seed)
 
+    # Move model to device
+    model = model.to(DEVICE)
+
     optimizer = torch.optim.Adam(model.parameters())
     loss_fn = nn.CrossEntropyLoss(**loss_kwargs)
 
+    # For gradient-based batching, we need a loss function with reduction='none'
+    loss_fn_per_sample = nn.CrossEntropyLoss(reduction='none')
+
+    # Prepare loss history for smart batch
     per_sample_loss = np.zeros(len(train_ds))
 
     train_accs, test_accs, train_losses, test_losses = [], [], [], []
@@ -48,12 +61,15 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
     for epoch in epoch_bar:
         correct, n, running_loss = 0, 0, 0
         model.train()
-
-        # Choose batch sampler
-        if batch_strategy.__name__ == "batch_sampler" and "loss_history" in batch_strategy.__code__.co_varnames:
-            batch_iter = batch_strategy(train_ds, batch_size, loss_history=per_sample_loss)
-        else:
-            batch_iter = batch_strategy(train_ds, batch_size)
+        # All batch strategies use the same interface with **kwargs
+        # Each strategy takes what it needs: loss_history, model, loss_fn, device, etc.
+        batch_iter = batch_strategy(
+            train_ds, batch_size,
+            loss_history=per_sample_loss,
+            model=model,
+            loss_fn=loss_fn_per_sample,
+            device=DEVICE
+        )
 
         # Create tqdm for batches
         num_batches = len(train_ds) // batch_size
