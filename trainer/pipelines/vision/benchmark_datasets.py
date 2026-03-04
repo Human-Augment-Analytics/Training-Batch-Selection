@@ -14,9 +14,9 @@ from trainer.constants_datasets import DATASET_SPECS
 from trainer.constants import SHARED_DATA_DIR
 
 # -------- config to tweak --------
-EPOCHS = 5
+EPOCHS = 1
 BATCH_SIZE = 64
-N_RUNS = 2
+N_RUNS = 1
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
@@ -28,14 +28,16 @@ else:
 print(f"[config] Using DEVICE = {DEVICE}, NAME = {DEVICE_NAME}")
 
 #specify the list of datasets to benchmark.  All dataset keys must exist in DATASET_SPECS
-#DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # for MLP
+DATASETS = ["mnist_csv", "mnist", "qmnist", "cifar10_flat"]  # for MLP
+#DATASETS = ["newt:fgvcx_plant_pathology_healthy_vs_sick", "iwildcam", "cifar10", "cifar100"]
 #DATASETS = ["cifar10", "cifar100"]
+#DATASETS = ["iwildcam"]
 
-DATASETS = ["newt:fgvcx_plant_pathology_healthy_vs_sick","newt:nabirds_species_classification_coohaw_shshaw"]
+#DATASETS = ["newt:fgvcx_plant_pathology_healthy_vs_sick","newt:nabirds_species_classification_coohaw_shshaw"]
 
-#MODEL_CLS =  SimpleMLP
+MODEL_CLS =  SimpleMLP
 #MODEL_CLS =  SimpleCNN
-MODEL_CLS = ResNet18
+#MODEL_CLS = ResNet18
 # -------------------------------------------
 
 def dataset_root(ds_name: str) -> str:
@@ -254,10 +256,10 @@ def plot_combined(all_means, run_dir, epochs_range, model_cls_name):
     plt.close()
 
 def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_runs=N_RUNS, model_cls=SimpleMLP):
-    strategy_label="Random-Benchmark"
-    random_strategy = get_random_strategy()
-#    strategy_label="Smart-Benchmark"
-#    random_strategy = get_smart_strategy()
+#    strategy_label="Random-Benchmark"
+#    random_strategy = get_random_strategy()
+    strategy_label="Smart-Benchmark"
+    random_strategy = get_smart_strategy()
 
     def plot_metric(metric, ylabel, title, filename):
         plt.figure(figsize=(7, 5))
@@ -282,6 +284,20 @@ def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_r
         base_name, overrides = parse_dataset_key(ds_key)
         train_ds, test_ds = build_dataset(shared_root=SHARED_DATA_DIR, name=base_name, **overrides)
 
+        # sanity: label range
+        def label_minmax(ds, n=2000):
+            n = min(n, len(ds))
+            vals = []
+            for i in range(n):
+                _, y = ds[i]
+                try:
+                    vals.append(int(y))
+                except Exception:
+                    return None
+            return (min(vals), max(vals), len(set(vals)))
+
+        print("[stats] train label min/max/uniq:", label_minmax(train_ds))
+        print("[stats] test  label min/max/uniq:", label_minmax(test_ds))
 
         ### is the dataset right?
         from collections import Counter
@@ -334,7 +350,7 @@ def run_benchmark_experiment(datasets, epochs=EPOCHS, batch_size=BATCH_SIZE, n_r
 
         # Save summary
         with open(os.path.join(run_dir, "summary.txt"), "a", buffering=1) as f:
-            f.write(f'{ds_key}\n')
+            f.write(f'Dataset: {ds_key}  Strategy: {strategy_label}\n')
             for i in range(EPOCHS):
                 f.write(f"Epoch {i+1}: train_acc={means['train_acc'][i]:.4f}±{cis['train_acc'][i]:.4f}, "
                         f"test_acc={means['test_acc'][i]:.4f}±{cis['test_acc'][i]:.4f}, "

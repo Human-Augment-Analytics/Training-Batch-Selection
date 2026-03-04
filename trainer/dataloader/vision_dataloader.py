@@ -5,9 +5,12 @@ import numpy as np
 from torchvision import transforms, datasets
 from PIL import Image
 from trainer.dataloader.base_dataloader import BaseDataset
+from wilds import get_dataset
+from torch.utils.data import Dataset
 
 print("vision_dataloader.py loaded from:", __file__)
 
+_ALLOWED_EXTRA_KWARGS = {"task", "img_size", "image_size"}
 
 ## Data loader for MNIST CSV dataset
 class MNISTCsvDataset(BaseDataset):
@@ -91,13 +94,17 @@ class CIFARDatasetUnified(BaseDataset):
         normalize: bool = True,
         augment: bool = False,
         in_channels: int = 3,
-#        mean: Optional[Sequence[float]] = None,
-#        std: Optional[Sequence[float]] = None,
         mean: list[float] = None,
         std: list[float] = None,
         flatten: bool = False,
         target_transform=None,  # keep hook for fine->coarse mapping, etc.
+        image_size=None,   # accept it
+        **kwargs,          # and anything else future builders pass
     ):
+
+        unknown = set(kwargs) - _ALLOWED_EXTRA_KWARGS
+        if unknown:
+            raise TypeError(f"CIFARDatasetUnified got unexpected kwargs: {sorted(unknown)}")
 
         print(f'[CIFARDatasetUnified]: constructing {dataset} dataset (train={train}) with in_channels={in_channels} and flatten={flatten}')
         dataset = dataset.lower()
@@ -250,3 +257,37 @@ class NeWTDatasetUnified(BaseDataset):
         return x, torch.tensor(y, dtype=torch.int64)
 
 
+class WILDSXY(Dataset):
+    """Wrap a WILDS subset so __getitem__ returns (x, y) only."""
+    def __init__(self, wilds_subset, *, target_transform=None, flatten=False):
+        self.ds = wilds_subset
+        self.target_transform = target_transform
+        self.flatten = flatten
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        x, y, meta = self.ds[idx]
+        y = int(y)
+        if self.target_transform is not None:
+            y = self.target_transform(y)
+        if self.flatten:
+            x = torch.flatten(x)
+        return x, torch.tensor(y, dtype=torch.int64)
+
+class IWildCam(Dataset):
+    def __init__(self, root, split, transform=None, download=False):
+        # split names in WILDS: 'train', 'val', 'test', plus some versions have 'id_val', 'id_test'
+        self.ds = get_dataset(
+            dataset="iwildcam",
+            root_dir=root,
+            download=download,
+        ).get_subset(split, transform=transform)
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        x, y, meta = self.ds[idx]  # WILDS returns (x, y, metadata)
+        return x, int(y)

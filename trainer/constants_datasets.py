@@ -68,6 +68,16 @@ DATASET_SPECS = {
         "normalize": True,
     },
 
+    "iwildcam": {
+        "builder": "build_iwildcam",
+        "input_dim": 3 * 224 * 224,
+        "num_classes": 182,     # got this from loading iwildcam dataset and then dataset.n_classes
+        "in_channels": 3,
+        "image_size": 224,
+        "subdir": "vision",
+        "augment": True,
+        "normalize": True,
+    }
     # add more …
 }
 
