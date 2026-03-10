@@ -66,6 +66,8 @@ DATASET_SPECS = {
         "task": "ml_photo_rating_12_vs_45_v2",  # default smoke-test task                                         
         "augment": True,
         "normalize": True,
+        "resnet18_pretrained": True,
+        "resnet18_freeze_backbone": True,
     },
 
     "iwildcam": {
@@ -77,6 +79,8 @@ DATASET_SPECS = {
         "subdir": "vision",
         "augment": True,
         "normalize": True,
+        "resnet18_pretrained": True,
+        "resnet18_freeze_backbone": True,
     }
     # add more …
 }

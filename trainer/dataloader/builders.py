@@ -70,56 +70,6 @@ def build_cifar100(root, *, normalize=True, augment=True, download=False, in_cha
                            in_channels=in_channels, mean=CIFAR100_MEAN, std=CIFAR100_STD, **kwargs)
     return train, test
 
-def build_newt(
-    root,
-    *,
-    task: str,
-    normalize=True,
-    augment=True,
-    in_channels=3,
-    image_size=224,
-    mean=None,
-    std=None,
-    **kwargs
-):
-    """                                                                                                           
-    Build NeWT (binary) datasets for ONE task.                                     Expects:                                                                         root/                                                                            newt2021_labels.csv                                                            newt2021_images/<id>.jpg                                                   """
-
-    if kwargs.get("flatten", None) is True:
-        raise ValueError("build_newt received flatten=True; remove that override.")
-
-    if mean is None:
-        mean = [0.485, 0.456, 0.406] if in_channels == 3 else [0.5]
-    if std is None:
-        std = [0.229, 0.224, 0.225] if in_channels == 3 else [0.5]
-
-    train = NeWTDatasetUnified(
-        root,
-        task=task,
-        split="train",
-        flatten=False,
-        normalize=normalize,
-        augment=augment,
-        in_channels=in_channels,
-        img_size=image_size,
-        mean=mean,
-        std=std,
-        **kwargs,
-    )
-    test = NeWTDatasetUnified(
-        root,
-        task=task,
-        split="test",
-        flatten=False,
-        normalize=normalize,
-        augment=False,
-        in_channels=in_channels,
-        img_size=image_size,
-        mean=mean,
-        std=std,
-        **kwargs,
-    )
-    return train, test
 
 
 import torch
@@ -213,3 +163,66 @@ def build_iwildcam(
 
     return train, test
 
+def build_newt(
+    root,
+    *,
+    task: str,
+    normalize=True,
+    augment=True,
+    in_channels=3,
+    image_size=224,
+    mean=None,
+    std=None,
+    **kwargs
+):
+    """
+    Build NeWT (binary) datasets for ONE task.
+    Expects:
+      root/
+        newt2021_labels.csv
+        newt2021_images/<id>.jpg
+    """
+
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_newt received flatten=True; remove that override.")
+
+    # Remove model-only args that may come from DATASET_SPECS
+    kwargs.pop("resnet18_pretrained", None)
+    kwargs.pop("resnet18_freeze_backbone", None)
+
+    # If a generic image_size sneaks in through kwargs, ignore it here
+    # because we're already using the explicit image_size argument above.
+    kwargs.pop("image_size", None)
+
+    if mean is None:
+        mean = [0.485, 0.456, 0.406] if in_channels == 3 else [0.5]
+    if std is None:
+        std = [0.229, 0.224, 0.225] if in_channels == 3 else [0.5]
+
+    train = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="train",
+        flatten=False,
+        normalize=normalize,
+        augment=augment,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
+    test = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="test",
+        flatten=False,
+        normalize=normalize,
+        augment=False,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
+    return train, test
