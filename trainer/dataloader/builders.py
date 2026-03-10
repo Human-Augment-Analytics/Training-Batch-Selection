@@ -1,6 +1,8 @@
 from trainer.dataloader.vision_dataloader import (
-    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified
+    MNISTRawDataset, MNISTCsvDataset, QMNISTDataset, CIFARDatasetUnified, NeWTDatasetUnified, WILDSXY
 )
+from torchvision import transforms
+from wilds import get_dataset
 
 # Each builder returns (train_ds, test_ds).
 # Defaults for preprocessing live here (not in the registry).
@@ -27,8 +29,7 @@ def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **
     # flattened 3*32*32 inputs to fit the MLP
     GRAY_MEAN, GRAY_STD = [0.5], [0.5]
     in_channels=1
-#    train = CIFAR10Dataset(root, train=True,  flatten=True,  download=download, normalize=normalize, augment=augment)
-#    test  = CIFAR10Dataset(root, train=False, flatten=True,  download=download, normalize=normalize, augment=False)
+
     train = CIFARDatasetUnified(root, dataset='cifar10', train=True,  flatten=True,
                            download=download, normalize=normalize, augment=augment,
                            in_channels=in_channels, mean=GRAY_MEAN, std=GRAY_STD, **kwargs)
@@ -39,6 +40,7 @@ def build_cifar10_flat(root, *, normalize=True, augment=True, download=False, **
 
 def build_cifar10(root, *, normalize=True, augment=True, download=False, in_channels=3, **kwargs):
 
+    
     if kwargs.get("flatten", None) is True:
         raise ValueError("build_cifar10 received flatten=True; remove that override.")
     print (f'building a dataset with in_channels={in_channels}')
@@ -66,5 +68,148 @@ def build_cifar100(root, *, normalize=True, augment=True, download=False, in_cha
     test  = CIFARDatasetUnified(root, dataset='cifar100', train=False, flatten=False,
                            download=download, normalize=normalize, augment=False,
                            in_channels=in_channels, mean=CIFAR100_MEAN, std=CIFAR100_STD, **kwargs)
+    return train, test
+
+def build_newt(
+    root,
+    *,
+    task: str,
+    normalize=True,
+    augment=True,
+    in_channels=3,
+    image_size=224,
+    mean=None,
+    std=None,
+    **kwargs
+):
+    """                                                                                                           
+    Build NeWT (binary) datasets for ONE task.                                     Expects:                                                                         root/                                                                            newt2021_labels.csv                                                            newt2021_images/<id>.jpg                                                   """
+
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_newt received flatten=True; remove that override.")
+
+    if mean is None:
+        mean = [0.485, 0.456, 0.406] if in_channels == 3 else [0.5]
+    if std is None:
+        std = [0.229, 0.224, 0.225] if in_channels == 3 else [0.5]
+
+    train = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="train",
+        flatten=False,
+        normalize=normalize,
+        augment=augment,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
+    test = NeWTDatasetUnified(
+        root,
+        task=task,
+        split="test",
+        flatten=False,
+        normalize=normalize,
+        augment=False,
+        in_channels=in_channels,
+        img_size=image_size,
+        mean=mean,
+        std=std,
+        **kwargs,
+    )
+    return train, test
+
+
+import torch
+from torchvision import transforms
+from torch.utils.data import Dataset
+from wilds import get_dataset
+
+class WILDSXY(Dataset):
+    def __init__(self, wilds_subset, *, flatten=False, target_transform=None):
+        self.ds = wilds_subset
+        self.flatten = flatten
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return len(self.ds)
+
+    def __getitem__(self, idx):
+        x, y, meta = self.ds[idx]
+        y = int(y)
+        if self.target_transform is not None:
+            y = self.target_transform(y)
+        if self.flatten:
+            x = torch.flatten(x)
+        return x, torch.tensor(y, dtype=torch.int64)
+
+
+def build_iwildcam(
+    root,
+    *,
+    normalize=True,
+    augment=True,
+    download=False,
+    in_channels=3,
+    image_size=224,
+    mean=None,
+    std=None,
+    # keep the same hook name torchvision uses
+    target_transform=None,
+    **kwargs
+):
+    # Mirror CIFAR behavior: ignore irrelevant spec keys if they appear
+    kwargs.pop("task", None)
+    kwargs.pop("img_size", None)  # just in case
+    # If someone tries to force flatten via overrides, fail loudly like others
+    if kwargs.get("flatten", None) is True:
+        raise ValueError("build_iwildcam received flatten=True; remove that override.")
+
+    if in_channels not in (1, 3):
+        raise ValueError("build_iwildcam: in_channels must be 1 or 3")
+
+    if mean is None:
+        mean = [0.485, 0.456, 0.406] if in_channels == 3 else [0.5]
+    if std is None:
+        std = [0.229, 0.224, 0.225] if in_channels == 3 else [0.5]
+
+    # train/eval transforms (similar spirit to NeWT)
+    def make_tfm(is_train: bool):
+        t = []
+        if is_train and augment:
+            t += [
+                transforms.RandomResizedCrop(image_size, scale=(0.8, 1.0)),
+                transforms.RandomHorizontalFlip(),
+            ]
+        else:
+            t += [
+                transforms.Resize(int(image_size * 256 / 224)),
+                transforms.CenterCrop(image_size),
+            ]
+        if in_channels == 1:
+            t.append(transforms.Grayscale(num_output_channels=1))
+        t.append(transforms.ToTensor())
+        if normalize:
+            t.append(transforms.Normalize(mean=mean, std=std))
+        return transforms.Compose(t)
+
+    base = get_dataset("iwildcam", root_dir=root, download=download)
+
+    # Choose which WILDS split to treat as "test"
+    # Many people use 'val' for quick iteration; switch to 'test' if desired.
+    train_subset = base.get_subset("train", transform=make_tfm(True))
+    test_subset  = base.get_subset("val",   transform=make_tfm(False))
+
+    train = WILDSXY(train_subset, flatten=False, target_transform=target_transform)
+    test  = WILDSXY(test_subset,  flatten=False, target_transform=target_transform)
+
+    # Optional parity fields (nice for prints)
+    train.in_channels = in_channels
+    test.in_channels = in_channels
+    train.num_classes = getattr(base, "n_classes", None)
+    test.num_classes = getattr(base, "n_classes", None)
+
     return train, test
 

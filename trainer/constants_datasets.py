@@ -56,6 +56,28 @@ DATASET_SPECS = {
         "subdir": "vision/ImageNet",
     },
 
+    "newt": {
+        "builder": "build_newt",
+        "input_dim": 3 * 224 * 224,
+        "num_classes": 2,
+        "in_channels": 3,
+        "image_size": 224,
+        "subdir": "vision/newt2021",
+        "task": "ml_photo_rating_12_vs_45_v2",  # default smoke-test task                                         
+        "augment": True,
+        "normalize": True,
+    },
+
+    "iwildcam": {
+        "builder": "build_iwildcam",
+        "input_dim": 3 * 224 * 224,
+        "num_classes": 182,     # got this from loading iwildcam dataset and then dataset.n_classes
+        "in_channels": 3,
+        "image_size": 224,
+        "subdir": "vision",
+        "augment": True,
+        "normalize": True,
+    }
     # add more …
 }
 

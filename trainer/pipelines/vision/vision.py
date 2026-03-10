@@ -183,9 +183,17 @@ def run_experiment(batch_strategy, strategy_label, train_ds, test_ds, model_cons
 
 def mean_and_ci(arrays, axis=0):
     arr = np.array(arrays)
+    n = arr.shape[0]
+
     mean = arr.mean(axis=0)
+
+    # If only one run, CI is zero.
+    if n < 2:
+        ci = np.zeros_like(mean, dtype=float)
+        return mean, ci
+
     sem = stats.sem(arr, axis=0)
-    ci = sem * stats.t.ppf((1 + 0.95) / 2., arr.shape[0] - 1)
+    ci = sem * stats.t.ppf((1 + 0.95) / 2., n - 1)
     return mean, ci
 
 def aggregate_results(results):
