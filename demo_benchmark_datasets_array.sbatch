@@ -9,8 +9,9 @@
 #SBATCH -t 08:00:00
 #SBATCH -o logs/%x-%A_%a.out
 #SBATCH -e logs/%x-%A_%a.err
-#SBATCH --array=0-0
+#SBATCH --array=0-7
 
+### Attention! Set array
 # array should be 1 less than total combinations, so for 20 combinations it should be 0-19
 
 set -euo pipefail
@@ -19,22 +20,18 @@ mkdir -p logs
 source ./venv/bin/activate
 
 DATASETS=(
-  "cifar10"
-  "cifar100"
+#  "cifar10"
+#  "cifar100"
   "newt:fgvcx_plant_pathology_healthy_vs_sick"
   "newt:nabirds_species_classification_coohaw_shshaw"
-  "iwildcam"
+#  "iwildcam"
 )
-
-# STRATEGIES=(
-#   "random"
-#   "smart"
-#   "milo"
-#   "corset"
-# )
 
 STRATEGIES=(
   "random"
+  "smart"
+  "milo"
+  "corset"
 )
 
 NUM_DATASETS=${#DATASETS[@]}
@@ -56,11 +53,11 @@ echo "Task ${SLURM_ARRAY_TASK_ID} / $((TOTAL-1))"
 echo "dataset=$dataset"
 echo "strategy=$strategy"
 
-srun python -u -m trainer.pipelines.vision.benchmark_datasets2 \
+srun python -u -m trainer.pipelines.vision.benchmark_datasets \
   --datasets "$dataset" \
   --strategies "$strategy" \
-  --epochs 1 \
-  --runs 1 \
+  --epochs 10 \
+  --runs 2 \
   --batch-size 64 \
   --model ResNet18 \
-  --run-tag smoke-0310
+  --run-tag smoke-0314
