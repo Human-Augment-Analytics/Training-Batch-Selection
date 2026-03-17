@@ -109,7 +109,6 @@ def train_model(model, train_ds, test_ds, epochs, batch_size, batch_strategy,
         train_acc = correct / n
         train_loss = running_loss / n
         test_acc, test_loss = evaluate(model, test_ds)
-
         train_accs.append(train_acc)
         train_losses.append(train_loss)
         test_accs.append(test_acc)
@@ -131,6 +130,10 @@ def evaluate(model, ds):
     model.eval()
     correct, n, total_loss = 0, 0, 0
     loss_fn = nn.CrossEntropyLoss()
+    # some signals for debugging
+    max_batch_loss = -1.0
+    max_abs_logit = 0.0
+
     with torch.no_grad():
         for x, y in loader:
             # x = x.view(x.size(0), -1) # replace with the below so images don't get flattened
@@ -139,6 +142,12 @@ def evaluate(model, ds):
             y = y.to(DEVICE, non_blocking=True)
             y_pred = model(x)
             loss = loss_fn(y_pred, y)
+
+            # debug signals
+            max_batch_loss = max(max_batch_loss, float(loss.item()))
+            max_abs_logit = max(max_abs_logit, float(y_pred.detach().abs().max().item()))
+            if max_abs_logit > 50:
+                print("Warning: large logits detected:", max_abs_logit)
             total_loss += loss.item() * x.size(0)
             correct += (y_pred.argmax(1) == y).sum().item()
             n += x.size(0)

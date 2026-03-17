@@ -49,27 +49,49 @@ class ResNet18(nn.Module):
         in_channels: int = 3,
         input_size: int = None,
         pretrained: bool = False,
+        freeze_backbone: bool = False,
     ):
         super().__init__()
 
         self.model = resnet18(weights="IMAGENET1K_V1" if pretrained else None)
 
-        # CIFAR adjustment based on input_size
+        # CIFAR-style stem adjustment
         if input_size is not None and input_size < 64:
             self.model.conv1 = nn.Conv2d(
                 in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False
             )
             self.model.maxpool = nn.Identity()
         else:
-            # ImageNet or general case: keep default conv1/maxpool
             if in_channels != 3:
                 self.model.conv1 = nn.Conv2d(
                     in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
                 )
 
-        # Replace FC
+        # Freeze backbone if requested
+        if freeze_backbone:
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+        # Replace classifier head
         in_features = self.model.fc.in_features
         self.model.fc = nn.Linear(in_features, num_classes)
 
+        # Always train the new head
+        for param in self.model.fc.parameters():
+            param.requires_grad = True
+
+        # If conv1 has been replaced, it is newly initialized, so you may want it trainable
+        if freeze_backbone and in_channels != 3:
+            for param in self.model.conv1.parameters():
+                param.requires_grad = True
+
+        print(
+            f"[ResNet18] pretrained={pretrained} "
+            f"freeze_backbone={freeze_backbone}"
+        )
+
     def forward(self, x):
         return self.model(x)
+
+
+
