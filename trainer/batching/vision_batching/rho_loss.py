@@ -11,14 +11,9 @@ from trainer.pipelines.vision.utils import shape_batch_for_model
 CANDIDATE_POOL_DEFAULT = 5000
 REF_EPOCHS = 2
 
-# Module-level cache for the reference model
-_ref_model = None
-
-
-def reset_reference_model():
-    """Reset the cached reference model (call between experiment runs)."""
-    global _ref_model
-    _ref_model = None
+# Cache: (dataset_id, model_class_name) -> frozen reference model
+# Keyed by dataset object identity so a new dataset always gets a fresh ref model.
+_ref_model_cache: dict = {}
 
 
 def train_reference_model(model, dataset, loss_fn, device, ref_epochs=REF_EPOCHS):
@@ -128,8 +123,6 @@ def batch_sampler(dataset, batch_size, model=None, loss_fn=None, device='cpu',
     Based on: "Prioritized Training on Points that are Learnable, Worth
     Learning, and Not Yet Learnt" (Mindermann et al., 2022).
     """
-    global _ref_model
-
     N = len(dataset)
     n_batches = N // batch_size
 
@@ -141,11 +134,14 @@ def batch_sampler(dataset, batch_size, model=None, loss_fn=None, device='cpu',
             yield indices[i * batch_size:(i + 1) * batch_size]
         return
 
-    # Train reference model once (cached across epochs within a run)
-    if _ref_model is None:
+    # Cache key: dataset object identity + model class, so each (dataset, model arch)
+    # pair gets its own reference model, but reuses it across epochs within a run.
+    cache_key = (id(dataset), type(model).__name__)
+    if cache_key not in _ref_model_cache:
         print("[RHO-LOSS] Training reference model...")
-        _ref_model = train_reference_model(model, dataset, loss_fn, device)
+        _ref_model_cache[cache_key] = train_reference_model(model, dataset, loss_fn, device)
         print("[RHO-LOSS] Reference model ready.")
+    ref_model = _ref_model_cache[cache_key]
 
     for _ in range(n_batches):
         # Select candidate pool
@@ -156,7 +152,7 @@ def batch_sampler(dataset, batch_size, model=None, loss_fn=None, device='cpu',
 
         # Compute losses for current model and reference model
         current_losses = compute_per_sample_losses(model, dataset, pool_idxs, loss_fn, device)
-        ref_losses = compute_per_sample_losses(_ref_model, dataset, pool_idxs, loss_fn, device)
+        ref_losses = compute_per_sample_losses(ref_model, dataset, pool_idxs, loss_fn, device)
 
         # RHO loss = current loss - reference loss
         rho_scores = current_losses - ref_losses
