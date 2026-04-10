@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 
-CANDIDATE_POOL_DEFAULT = 500  # Reduced from 5000 for faster computation
+CANDIDATE_POOL_DEFAULT = 500
+VAL_SAMPLE_SIZE = 2  # Match GREATS paper val_batchsize=2
 
 
 def compute_gradient_vectors(model, dataset, indices, loss_fn, device='cpu'):
@@ -33,74 +34,82 @@ def compute_gradient_vectors(model, dataset, indices, loss_fn, device='cpu'):
     return torch.stack(gradient_vectors)
 
 
-def get_great_batch(gradient_vectors, pool_idxs, batch_size):
+def greedy_selection(scores, interaction_matrix, K):
     """
-    Select batch using GREAT (GREedy Approximation Taylor Selection).
+    Select K data points based on the highest scores, dynamically updating scores
+    by subtracting interactions with previously selected data points.
 
-    GREAT uses a greedy approximation of the Taylor series expansion to select
-    samples that maximize the expected loss reduction by selecting gradients
-    with maximum orthogonal contribution to the already selected set.
+    Ported from GREATS (NeurIPS 2024):
+    GREATS/less/train/utils_ghost_dot_prod.py
+
+    Parameters:
+    - scores: A numpy array of initial TracIN scores for each data point.
+    - interaction_matrix: A numpy matrix of pairwise gradient similarity between data points.
+    - K: The number of data points to select.
+
+    Returns:
+    - selected_indices: Indices of the selected data points.
     """
-    n_samples = len(gradient_vectors)
+    scores = scores.copy()
+    selected_indices = []
+
+    for _ in range(K):
+        idx_max = np.argmax(scores)
+        selected_indices.append(idx_max)
+
+        # Reduce scores of similar samples to promote diversity
+        scores -= interaction_matrix[idx_max, :]
+
+        # Prevent re-selection
+        scores[idx_max] = -np.inf
+
+    return selected_indices
+
+
+def get_great_batch(train_grads, val_grads, pool_idxs, batch_size, lr=1.0):
+    """
+    Select batch using GREATS algorithm (NeurIPS 2024).
+
+    Uses TracIN scores (gradient dot product with validation set) for importance
+    and a similarity matrix (pairwise gradient dot products) for redundancy-aware
+    greedy selection.
+
+    Parameters:
+    - train_grads: Gradient vectors for training candidate samples [N, D]
+    - val_grads: Gradient vectors for validation samples [V, D]
+    - pool_idxs: Original dataset indices for the candidate pool
+    - batch_size: Number of samples to select
+    - lr: Current learning rate for scaling (matching GREATS paper)
+    """
+    n_samples = len(train_grads)
     batch_size = min(batch_size, n_samples)
-    device = gradient_vectors.device
 
-    # Compute gradient norms
-    grad_norms = torch.norm(gradient_vectors, dim=1)
+    # TracIN scores: dot product of each train gradient with mean validation gradient
+    mean_val_grad = val_grads.mean(dim=0)
+    tracin_scores = (train_grads @ mean_val_grad).cpu().numpy()
 
-    # Start with sample having highest gradient norm
-    selected_indices = [torch.argmax(grad_norms).item()]
-    remaining_mask = torch.ones(n_samples, dtype=torch.bool, device=device)
-    remaining_mask[selected_indices[0]] = False
+    # Similarity matrix: pairwise dot products within training gradients
+    similarity_matrix = (train_grads @ train_grads.T).cpu().numpy()
 
-    # Keep track of the orthonormal basis of selected gradients
-    first_grad = gradient_vectors[selected_indices[0]].clone()
-    basis = [first_grad / torch.norm(first_grad)]
+    # Scale by learning rate (matching GREATS paper: tracin * lr, similarity * lr²)
+    selected = greedy_selection(
+        tracin_scores * lr,
+        similarity_matrix * (lr ** 2),
+        batch_size
+    )
 
-    # Greedily select remaining samples
-    for _ in range(batch_size - 1):
-        if remaining_mask.sum() == 0:
-            break
-
-        remaining_grads = gradient_vectors[remaining_mask]
-
-        max_orthogonal_norm = -1
-        best_idx = None
-        best_orthogonal_grad = None
-
-        for i, grad in enumerate(remaining_grads):
-            # Project onto existing basis and subtract to get orthogonal component
-            orthogonal_grad = grad.clone()
-            for basis_vec in basis:
-                projection = torch.dot(grad, basis_vec)
-                orthogonal_grad -= projection * basis_vec
-
-            orthogonal_norm = torch.norm(orthogonal_grad).item()
-
-            if orthogonal_norm > max_orthogonal_norm:
-                max_orthogonal_norm = orthogonal_norm
-                remaining_indices = torch.where(remaining_mask)[0]
-                best_idx = remaining_indices[i].item()
-                best_orthogonal_grad = orthogonal_grad
-
-        if best_idx is None:
-            break
-
-        selected_indices.append(best_idx)
-        remaining_mask[best_idx] = False
-
-        if max_orthogonal_norm > 1e-6:
-            basis.append(best_orthogonal_grad / max_orthogonal_norm)
-
-    # Convert pool indices to original dataset indices
-    return pool_idxs[np.array(selected_indices)]
+    return pool_idxs[np.array(selected)]
 
 
 def batch_sampler(dataset, batch_size, model=None, loss_fn=None, device='cpu',
-                  candidate_pool=CANDIDATE_POOL_DEFAULT, **kwargs):
+                  candidate_pool=CANDIDATE_POOL_DEFAULT, val_dataset=None,
+                  lr=1e-3, **kwargs):
     """
-    GREAT batch sampler that yields batches based on greedy Taylor approximation.
-    Uses a candidate pool approach similar to MILO and CORESET for efficiency.
+    GREATS-style batch sampler using TracIN scoring with redundancy-aware
+    greedy selection. Architecture-agnostic (uses full backprop gradients).
+
+    Based on: "GREATS: Online Selection of High-Quality Data for LLM Training
+    in Every Iteration" (NeurIPS 2024).
     """
     N = len(dataset)
     n_batches = N // batch_size
@@ -114,14 +123,31 @@ def batch_sampler(dataset, batch_size, model=None, loss_fn=None, device='cpu',
         return
 
     for _ in range(n_batches):
-        # Select candidate pool
+        # Select candidate pool from training set
         if candidate_pool < N:
             pool_idxs = np.random.choice(N, candidate_pool, replace=False)
         else:
             pool_idxs = np.arange(N)
 
         # Compute gradient vectors for candidate pool
-        gradient_vectors = compute_gradient_vectors(model, dataset, pool_idxs, loss_fn, device)
+        train_grads = compute_gradient_vectors(model, dataset, pool_idxs, loss_fn, device)
 
-        # Select batch using GREAT algorithm
-        yield get_great_batch(gradient_vectors, pool_idxs, batch_size)
+        if val_dataset is not None:
+            # Sample a small validation subset (matching GREATS val_batchsize)
+            val_idxs = np.random.choice(len(val_dataset), VAL_SAMPLE_SIZE, replace=False)
+            val_grads = compute_gradient_vectors(model, val_dataset, val_idxs, loss_fn, device)
+
+            yield get_great_batch(train_grads, val_grads, pool_idxs, batch_size, lr=lr)
+        else:
+            # Fallback: no validation set — use gradient norms as scores
+            # (equivalent to GREATS GradNorm variant)
+            grad_norms = torch.norm(train_grads, dim=1).cpu().numpy()
+            similarity_matrix = (train_grads @ train_grads.T).cpu().numpy()
+
+            selected = greedy_selection(
+                grad_norms,
+                similarity_matrix * 0,  # No interaction for GradNorm fallback
+                batch_size
+            )
+
+            yield pool_idxs[np.array(selected)]
