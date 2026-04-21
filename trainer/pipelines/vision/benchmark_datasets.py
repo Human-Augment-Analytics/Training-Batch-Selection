@@ -76,6 +76,8 @@ STRATEGIES = {
     "smart": "trainer.batching.vision_batching.smart_batch:batch_sampler",
     "milo": "trainer.batching.vision_batching.milo:batch_sampler",
     "corset": "trainer.batching.vision_batching.corset:batch_sampler",
+    "grand": "trainer.batching.vision_batching.grand:batch_sampler",
+    "great": "trainer.batching.vision_batching.great:batch_sampler",
 }
 
 # Model class

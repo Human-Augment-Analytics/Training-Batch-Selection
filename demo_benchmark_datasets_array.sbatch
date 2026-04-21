@@ -6,10 +6,10 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:H100:1
 #SBATCH --mem=32G
-#SBATCH -t 08:00:00
+#SBATCH -t 16:00:00
 #SBATCH -o logs/%x-%A_%a.out
 #SBATCH -e logs/%x-%A_%a.err
-#SBATCH --array=0-7
+#SBATCH --array=0-1
 
 ### Attention! Set array
 # array should be 1 less than total combinations, so for 20 combinations it should be 0-19
@@ -20,18 +20,20 @@ mkdir -p logs
 source ./venv/bin/activate
 
 DATASETS=(
-#  "cifar10"
-#  "cifar100"
-  "newt:fgvcx_plant_pathology_healthy_vs_sick"
-  "newt:nabirds_species_classification_coohaw_shshaw"
+  "cifar10"
+  "cifar100"
+#  "newt:fgvcx_plant_pathology_healthy_vs_sick"
+#  "newt:nabirds_species_classification_coohaw_shshaw"
 #  "iwildcam"
 )
 
 STRATEGIES=(
-  "random"
-  "smart"
+#  "random"
+#  "great"
+#  "grand"
+#  "smart"
   "milo"
-  "corset"
+#  "corset"
 )
 
 NUM_DATASETS=${#DATASETS[@]}
@@ -56,8 +58,8 @@ echo "strategy=$strategy"
 srun python -u -m trainer.pipelines.vision.benchmark_datasets \
   --datasets "$dataset" \
   --strategies "$strategy" \
-  --epochs 10 \
-  --runs 2 \
+  --epochs 1 \
+  --runs 1 \
   --batch-size 64 \
   --model ResNet18 \
-  --run-tag smoke-0314
+  --run-tag milo-failure-backoff-0412

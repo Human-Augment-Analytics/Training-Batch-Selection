@@ -14,7 +14,9 @@ def compute_gradient_norms(model, dataset, indices, loss_fn, device='cpu'):
 
     for idx in indices:
         x, y = dataset[idx]
-        x = x.view(1, -1).to(device)
+#        x = x.view(1, -1).to(device)  #LMT for flattened
+        x = x.unsqueeze(0).to(device)
+
         y = torch.tensor([y]).to(device)
 
         model.zero_grad()
